@@ -1,0 +1,25 @@
+services:
+  deaddrop:
+    build: .
+    image: deaddrop
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      # Wallet seeds and match state. Back these up.
+      - wallets:/app/.wallets
+      - data:/app/.data
+    environment:
+      # Set to 1 when running behind a reverse proxy (Caddy, nginx, Fly) so client IPs come from X-Forwarded-For.
+      TRUST_PROXY: "0"
+      # LEDGER: mock          # uncomment for a no-money demo
+      # PRIZE_ZAT: 1000000           # 0.01 TAZ per head-to-head win
+      # PRIZE_DAILY_BUDGET_ZAT: 10000000
+      # PRIZE_MATCHES_PER_DAY: 3     # per player
+      # BOT_PRIZE_ZAT: 0             # bot games are practice
+      # TURN_SECONDS: 60
+      # ZINGO_SERVER: https://testnet.zec.rocks:443
+
+volumes:
+  wallets:
+  data:
