@@ -1,6 +1,79 @@
-# Zonar
+# Zonar 🛰️
 
-Two agents hunt a vault of **real Zcash testnet ZEC** buried in the heart of a surveilled 7×7 city. The winner sweeps the vault to their own address in one shielded transaction and keeps a relic, a collectible generated from the match's fairness commitment.
+**A fog-of-war treasure hunt where the fog is real cryptography.**
+
+Two agents drop into a surveilled pixel city. Somewhere in its glowing heart, a vault of real Zcash testnet ZEC is buried. Find it, dig it up, and carry it home before your rival steals it off your back. When two agents play head-to-head, every move is a sealed, signed **shielded Zcash transaction**: on-chain, provable, and invisible to the other player until the match ends.
+
+**Play it now: https://dz1798t62xgz8.cloudfront.net**
+
+No sign-up, no download. Practice against the bot in a minute, then send a friend a link and play for a real testnet prize.
+
+---
+
+## Why we built this
+
+Fog-of-war games have always had a dirty secret: **the fog is fake.** The server sees everything. Your opponent's position sits in a packet on your machine, one wallhack away. And the referee asks you to trust that it didn't peek, didn't nudge the loot, didn't fix the outcome.
+
+Blockchains promise fairness, but public chains make it worse: every move is out in the open for anyone to read, so hidden-information games are impossible on them.
+
+Zcash was built for exactly this. With shielded transactions, both halves work at once:
+
+- **Hidden:** shielded transactions encrypt sender, receiver, amount and memo. Your rival sees *that* you moved. They never see *where* you moved.
+- **Provable:** every move is still a real transaction on a public ledger, timestamped and signed by your own key. When the match ends, the viewing key is published and everyone can check that the game was played exactly as it said.
+
+Zonar is a small, playful demo of a big idea: **privacy and verifiability aren't opposites.** You can have a game where nobody can cheat by peeking, nobody can rewrite history, and the payout is a transaction anyone can check.
+
+## What "shielded" means here
+
+A normal (transparent) crypto transaction is a postcard: anyone can read who sent what to whom. A **shielded** Zcash transaction is a sealed envelope that comes with a zero-knowledge proof that the contents are valid. The network checks the proof, never the contents.
+
+In Zonar, that gives you things no ordinary fog-of-war game can:
+
+| | Ordinary online game | Public-chain game | **Zonar** |
+|---|---|---|---|
+| Rival can't see your moves | Only if the server is honest | ❌ everything is public | ✅ encrypted on-chain |
+| Moves can't be rewritten later | Trust the server | ✅ | ✅ signed and anchored |
+| Anyone can audit the match afterwards | ❌ | ✅ but no secrets ever | ✅ viewing key published at the end |
+| Prize payout you can verify | ❌ | ✅ but in public | ✅ a shielded sweep from the vault to your address |
+
+- **Your agent wallet** lives in your browser, unlocked by your **passkey** (Face ID, Touch ID or a security key). The server can build your transactions but can never spend your money.
+- **Each move** is a signed memo inside a shielded transaction sent to the match's vault.
+- **The vault** is a fresh shielded wallet per match, funded by the house. The winner sweeps it in one shielded transaction whose memo is their **relic**, a collectible certificate of the win.
+
+## Why it's fun
+
+- **It's a mind game.** You and your rival move at the same time, in secret. You don't know where they are, but they're leaving traces, and so are you.
+- **Pings, leaks, chaff and keys.** A ping tells you how close the drop is: Locked, Faint or Static. A leak gives you the exact distance, but flashes your district on the rival's screen. Chaff fakes that flash anywhere you like, to send them the wrong way. A viewing key unlocks a 2×2 patch of the city and shows you the drop or your rival if either is there. Twelve credits, twenty turns. Choose well.
+- **Grab it, then run.** Digging up the drop is only half the game. The carrier's position flashes to the rival every other turn, and if they land on your tile they **steal** it. Then *you're* the hunter.
+- **It's cute.** A Tamagotchi-style pixel city with cars, fountains, boats and a pet that carries the treasure chest on its head. Toasts after every move, confetti and gold coins when you win.
+- **The win is real.** Head-to-head winners get real testnet ZEC and a relic minted from the match's fairness commitment.
+- **You can prove you were robbed (or that you weren't).** After every match, your browser replays the whole game itself and checks every clue it was ever shown.
+
+## How to play
+
+1. **Pick a codename and a pet.** Optionally create an agent wallet with your passkey: the house funds it with 24 moves.
+2. **Start a match:** practice against GHOST the bot, or create a private match and share the link.
+3. **Hunt.** Each turn, seal one move (one step in any direction) and one action. The drop is always somewhere in the central Halo Spire district, C3 to E5.
+4. **Dig** when you think you're on it. Found it? The chest jumps onto your pet.
+5. **Extract.** Carry it to your own safehouse (A1 if you created the match, G7 if you joined). Arrive with it and you win.
+6. **Claim.** In a prize match, sweep the vault into your agent wallet or any testnet address. Then check the fairness proof on the end screen.
+
+## Fair by construction
+
+Nobody, not even the house, chooses where the treasure is:
+
+- Before the match the house publishes a hash commitment to a secret.
+- Each player's browser adds its own 32 bytes of randomness.
+- The drop is derived from all three, and only once both seats are filled.
+- At the end the secret and both randomness values are revealed. Your browser re-derives the drop, checks its own randomness was used, replays every turn through the same rules the server runs, and checks the result against the hash chain anchored on-chain.
+
+If anything doesn't match, the end screen tells you exactly which turn.
+
+---
+
+# For developers
+
+## Run it locally
 
 Requires Node 23.6+ (the server runs its TypeScript directly via Node's type stripping, no build step).
 
@@ -94,7 +167,7 @@ Build the builder with `cargo build --release -p zonar-builder` in `builder/` (t
 
 The server keeps wallet processes and match state alive, so it needs a long-running host with persistent disk (a VPS, Fly.io, Railway). Serverless platforms like Vercel won't work.
 
-**Step-by-step on AWS Lightsail with a free CloudFront HTTPS address: see [DEPLOY.md](DEPLOY.md).** The rest of this section is the general picture.
+**Step-by-step on AWS (one EC2 server behind CloudFront, which gives a free HTTPS address): see [DEPLOY.md](DEPLOY.md).** That's how the live game runs. The rest of this section is the general picture.
 
 ```
 docker compose up --build -d
@@ -132,4 +205,4 @@ Everything is TypeScript in `strict` mode. Relative imports carry their `.ts` ex
 - **Distance:** Chebyshev (diagonal moves count as 1). Ping readings: Locked ≤1, Faint ≤3, Static beyond.
 - **Costs:** ping 1, leak 1, chaff 2, viewing key 4, dig free; 12 starting credits.
 - **Flashes:** a leak flashes the sender's whole **district**, and chaff flashes any district. Districts are 2×2, 2×3 or 3×3.
-- **Resolution order:** spend → move → collision/steal → dig → intel → carrier exposure → win/draw. Simultaneous digs on the drop are decided by a coin flip.
+- **Resolution order:** spend → move → collision/steal → dig → intel → carrier exposure → win/draw. Simultaneous digs on the drop are settled by a tie-break derived from the house secret, so the replay is exact.
