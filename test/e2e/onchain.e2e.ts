@@ -59,7 +59,7 @@ async function createAgent(page: Page, codename: string, avatar: string) {
   const moves = await until(
     `${codename}'s refill to confirm`,
     async () => {
-      const n = Number(await page.locator('span.font-mono.text-2xl').first().textContent({ timeout: 1000 }).catch(() => '0'));
+      const n = Number(await page.getByTestId('moves-funded').textContent({ timeout: 1000 }).catch(() => '0'));
       return n >= 12 ? n : null;
     },
     900_000,
