@@ -1,13 +1,13 @@
 'use client';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import Avatar from '@/components/Avatar';
 import { Icon } from '@/components/Pixel';
 import { TxLink } from './Panels';
 import { relicSVG } from '@/lib/relic';
 import { districtOf, tileName as fmt } from '@/lib/city';
-import { sha256 } from '@/lib/game';
-import { api, short, taz, type Session } from '@/lib/api';
+import { audit, type Audit } from '@/lib/rules';
+import { api, entropy, short, taz, type Session } from '@/lib/api';
 import { agentAddress, storedAgent } from '@/lib/agent';
 import { fromB64, memoMatches } from '@/lib/moves';
 import type { GameView } from '@/lib/types';
@@ -58,7 +58,7 @@ export function Waiting({ view: v }: { view: GameView }) {
         Head-to-head matches put a real testnet vault at stake, within today&apos;s prize limits. Two tabs on the same network play for practice.
       </p>
       <div className="toy-sm mt-6 rounded-xl bg-paper p-4 font-mono text-[11px] text-muted">
-        Drop location commitment, published before anyone moves:
+        House commitment, published before anyone moves. The drop is placed from the house&apos;s secret and both players&apos; own randomness, once you&apos;re both in:
         <div className="mt-1 break-all text-ink">{v.commitment}</div>
       </div>
     </Shell>
@@ -74,7 +74,6 @@ export function End({ view: v, session, onClose }: { view: GameView; session: Se
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   const [showSeed, setShowSeed] = useState(false);
-  const [proof, setProof] = useState<{ drop: boolean | null; chain: boolean | null }>({ drop: null, chain: null });
 
   // On-chain matches: every revealed move memo must be signed by its seat's agent and
   // spell out exactly the orders the replayed transcript says that seat gave.
@@ -90,15 +89,17 @@ export function End({ view: v, session, onClose }: { view: GameView; session: Se
   })();
   const myAgent = typeof window !== 'undefined' && v.agent ? storedAgent() : null;
 
-  const preimage = `${v.matchId}|${r.drop.x},${r.drop.y}|${r.salt}`;
-  useEffect(() => {
-    (async () => {
-      const dropOk = (await sha256(preimage)) === v.commitment;
-      let head = v.commitment;
-      for (const t of r.transcript) head = await sha256(head + JSON.stringify(t));
-      setProof({ drop: dropOk, chain: head === v.chainHead });
-    })();
-  }, [preimage, v.commitment, v.chainHead, r.transcript]);
+  // Replays the whole match in this browser under the same rules the server ran.
+  const proof: Audit = useMemo(
+    () =>
+      audit(
+        { matchId: v.matchId, commitment: v.commitment, chainHead: v.chainHead, drop: r.drop, salt: r.salt, entropy: r.entropy, transcript: r.transcript, result: r },
+        v.seat,
+        v.intel,
+        entropy.get(v.matchId),
+      ),
+    [v.matchId, v.commitment, v.chainHead, v.seat, v.intel, r],
+  );
 
   const practice = (c.mode ?? 'prize') !== 'prize';
   const relic = won ? relicSVG({ matchId: v.matchId, commitment: v.commitment, drop: r.drop, turn: v.turn, codename: v.you.name, sweepTxid: c.sweep?.txid, practice }) : '';
@@ -217,8 +218,25 @@ export function End({ view: v, session, onClose }: { view: GameView; session: Se
 
           <div className="lcd space-y-1.5 rounded-2xl border-2 border-ink p-4 font-mono text-[11px] text-lcd-ink">
             <div className="font-tiny text-[11px] uppercase tracking-[0.14em]">Fairness proof</div>
-            <div className="break-all">sha256({preimage})</div>
-            <Check ok={proof.drop}>{proof.drop === false ? `does not match commitment ${short(v.commitment)}!` : `matches the opening commitment ${short(v.commitment)}. The drop never moved.`}</Check>
+            <Check ok={proof.commitment}>
+              {proof.commitment ? `The house secret re-hashes to the opening commitment ${short(v.commitment)}.` : `The house secret does not match commitment ${short(v.commitment)}!`}
+            </Check>
+            {proof.drop !== null && (
+              <Check ok={proof.drop}>
+                {proof.drop
+                  ? `The drop at ${fmt(r.drop)} follows from the house secret plus both players' randomness. Nobody picked it alone.`
+                  : 'The drop is not where the house secret and both players’ randomness put it!'}
+              </Check>
+            )}
+            {proof.myEntropy !== null && (
+              <Check ok={proof.myEntropy}>{proof.myEntropy ? 'Your browser’s randomness was used as sent.' : 'The server did not use the randomness your browser sent!'}</Check>
+            )}
+            <Check ok={proof.clues}>
+              {proof.clues
+                ? `Replayed all ${r.transcript.length} turns: every one of your ${proof.clueCount} clues is exactly what the rules give.`
+                : `Your clues diverge from the rules at turn ${proof.firstBadTurn}!`}
+            </Check>
+            <Check ok={proof.outcome}>{proof.outcome ? 'Every move was legal, and the replay ends the way the match did.' : 'The replay does not end the way the server says!'}</Check>
             {moves && (
               <Check ok={moves.bad === 0}>
                 {moves.bad === 0
@@ -231,6 +249,7 @@ export function End({ view: v, session, onClose }: { view: GameView; session: Se
                 ? 'turn transcript does not match the hash chain!'
                 : `${r.transcript.length} turns re-hash to ${short(v.chainHead)}${anchored ? `, anchored on-chain through turn ${anchored.turn}` : ''}.`}
             </Check>
+            {r.entropy && <div className="break-all pt-1">House secret {r.salt} · entropy {r.entropy.map((e) => short(e)).join(' + ')}</div>}
             {c.ufvk && <div className="break-all pt-1">Vault viewing key (decrypts every anchor memo): {c.ufvk}</div>}
           </div>
 
@@ -248,7 +267,6 @@ export function End({ view: v, session, onClose }: { view: GameView; session: Se
   );
 }
 
-function Check({ ok, children }: { ok: boolean | null; children: ReactNode }) {
-  if (ok == null) return <div>verifying…</div>;
+function Check({ ok, children }: { ok: boolean; children: ReactNode }) {
   return <div className={ok ? 'font-semibold text-[#2c7a4b]' : 'font-semibold text-alert'}>{ok ? '✓' : '✗'} {children}</div>;
 }

@@ -10,7 +10,7 @@ import HouseStatus from '@/components/HouseStatus';
 import AgentCard from '@/components/AgentCard';
 import type { StoredAgent } from '@/lib/agent';
 import { AVATARS } from '@/lib/avatars';
-import { api, prefs, session, taz } from '@/lib/api';
+import { api, entropy, prefs, session, taz } from '@/lib/api';
 import type { HouseInfo } from '@/lib/types';
 
 type Mode = 'bot' | 'create' | 'join';
@@ -42,12 +42,15 @@ export default function Launch() {
     prefs.set('avatar', avatar);
     // Joining with an agent makes a head-to-head match on-chain (when the rival has one too).
     const creds = agent ? { agentId: agent.id, agentToken: agent.token } : {};
+    // This browser's share of the randomness that places the drop.
+    const mine = entropy.fresh();
     try {
       const r =
         kind === 'join'
-          ? await api<Joined>('/api/join', { name, avatar, matchId: code.trim(), ...creds })
-          : await api<Joined>('/api/match', { name, avatar, vsBot: kind === 'bot', ...creds });
+          ? await api<Joined>('/api/join', { name, avatar, matchId: code.trim(), entropy: mine, ...creds })
+          : await api<Joined>('/api/match', { name, avatar, vsBot: kind === 'bot', entropy: mine, ...creds });
       session.set(r.matchId, r.token);
+      entropy.set(r.matchId, mine);
       router.push(`/play/${r.matchId}`);
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));

@@ -31,6 +31,12 @@ export const session = {
   get: (matchId: string) => read(matchId),
   set: (matchId: string, token: string) => write(matchId, token),
 };
+// The randomness this browser added to a match's drop, kept to check against the reveal.
+export const entropy = {
+  fresh: () => Array.from(crypto.getRandomValues(new Uint8Array(32)), (b) => b.toString(16).padStart(2, '0')).join(''),
+  get: (matchId: string) => read('entropy:' + matchId),
+  set: (matchId: string, hex: string) => write('entropy:' + matchId, hex),
+};
 export const prefs = {
   get: (key: string, fallback = '') => read(key) ?? fallback,
   set: (key: string, value: string) => write(key, value),

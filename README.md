@@ -37,7 +37,9 @@ Pages: `/` landing, `/play` launch (codename + avatar), `/play/<code>` the match
 | Draw | vault → house (refund) | `DEADDROP REFUND #id` |
 
 - Gameplay never waits on blocks. Chain work runs in the background, and the "On-chain trail" panel links each txid to the testnet explorer.
-- The turn hash chain starts at the drop commitment and absorbs each turn's orders. At the end the browser re-hashes the revealed transcript and checks it against the anchored head.
+- **Jointly random drop.** Creating a match, the house publishes `sha256(match|house|secret)`. Each player's browser sends 32 random bytes when it creates or joins, and the drop is derived from the secret plus both entropies only once both seats are filled (`lib/rules.ts`), so neither the house nor either player picks it alone.
+- **Full replay.** At the end the secret, both entropies and every turn's orders are revealed. The browser re-derives the drop, checks its own entropy was used, and replays the whole match through the same `resolve` the server runs, comparing every clue it was shown and the outcome. Simultaneous digs are settled from the secret, so the replay is exact.
+- The turn hash chain starts at the house commitment and absorbs each turn's orders. At the end the browser re-hashes the revealed transcript and checks it against the anchored head.
 - When the match ends, the vault's **viewing key** is published to both players so anyone can decrypt every anchor memo. The vault's **seed** goes only to the winner, who can import it into any testnet wallet instead of using the one-click claim.
 - The payout address is requested only on claim, kept on the match only until the sweep is sent, then deleted.
 

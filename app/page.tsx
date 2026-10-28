@@ -33,7 +33,7 @@ const PRIVACY = [
 ];
 
 const CHAIN = [
-  { label: 'Vault funded', memo: 'DEADDROP VAULT #A281A4 commit 45951e52…', note: 'A fresh wallet per match, funded with the prize. The memo carries the drop commitment.' },
+  { label: 'Vault funded', memo: 'DEADDROP VAULT #A281A4 commit 45951e52…', note: 'A fresh wallet per match, funded with the prize. The memo carries the house’s commitment.' },
   { label: 'Moves signed', memo: 'DD1|C1A4D7|T3|S0|1,1|ping|-|Vk2…', note: 'Each move is a zero-value shielded memo from your agent’s wallet to the vault, signed in your browser.' },
   { label: 'Vault swept', memo: 'DEADDROP RELIC #A281A4 | Halo Spire D4 | T12', note: 'One send-all to the winner. The memo is the relic certificate.' },
 ];
@@ -174,8 +174,8 @@ export default function Landing() {
                 <div>
                   <h3 className="font-display text-xl font-bold">Anyone can check</h3>
                   <p className="mt-1 text-[15px] text-ink/75">
-                    At the end, the drop’s location and salt are revealed and re-hashed in your browser, and every signed move is verified against
-                    the replayed game. The vault’s viewing key is published so anyone can read the memos on-chain.
+                    Nobody picks the drop alone: it comes from the house’s committed secret plus both players’ own randomness. At the end your
+                    browser replays every turn under the same rules, checks every clue you were shown, and verifies every signed move. The vault’s viewing key is published so anyone can read the memos on-chain.
                   </p>
                 </div>
               </li>
