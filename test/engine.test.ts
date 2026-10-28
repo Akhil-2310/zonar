@@ -34,7 +34,30 @@ function setup(drop: Pos = { x: 3, y: 2 }): Match {
 test('commitment verifies against revealed drop', () => {
   const m = createMatch('X1');
   assert.equal(m.commitment, commitmentOf('X1', m.drop, m.salt));
-  assert.ok(SAFEHOUSES.every((s) => Math.max(Math.abs(s.x - m.drop.x), Math.abs(s.y - m.drop.y)) >= 2));
+});
+
+test('7×7 city: the drop is always in the vault district, which is fair to both safehouses', async () => {
+  const { VAULT_DISTRICT, inVaultDistrict, districtArea, districtOf } = await import('../lib/city.ts');
+  const seen = new Set<string>();
+  for (let i = 0; i < 400; i++) {
+    const m = createMatch('V' + i);
+    assert.ok(inVaultDistrict(m.drop), `drop ${m.drop.x},${m.drop.y} outside the vault district`);
+    seen.add(`${m.drop.x},${m.drop.y}`);
+  }
+  assert.equal(seen.size, 9, 'every vault tile gets used');
+  assert.deepEqual(SAFEHOUSES, [{ x: 0, y: 0 }, { x: 6, y: 6 }]);
+  // Mirror symmetry: each vault tile has a twin that is as far from the other safehouse.
+  const d = (a: Pos, b: Pos) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
+  const tiles = [...seen].map((s) => ({ x: Number(s.split(',')[0]), y: Number(s.split(',')[1]) }));
+  const sumA = tiles.reduce((n, t) => n + d(t, SAFEHOUSES[0]), 0);
+  const sumB = tiles.reduce((n, t) => n + d(t, SAFEHOUSES[1]), 0);
+  assert.equal(sumA, sumB);
+  assert.equal(d({ x: 3, y: 3 }, SAFEHOUSES[0]), d({ x: 3, y: 3 }, SAFEHOUSES[1]), 'D4 is the true centre');
+  // Districts are 2-3-2 bands; a leak flashes the whole district.
+  assert.deepEqual(districtArea({ x: 3, y: 4 }), VAULT_DISTRICT);
+  assert.deepEqual(districtArea({ x: 6, y: 0 }), { x: 5, y: 0, w: 2, h: 2 });
+  assert.deepEqual(districtArea({ x: 0, y: 3 }), { x: 0, y: 2, w: 2, h: 3 });
+  assert.equal(districtOf({ x: 3, y: 3 }), 'Halo Spire');
 });
 
 test('turn resolves only when both lock in, and spends hidden credits', () => {
@@ -62,17 +85,19 @@ test('leak and chaff produce identical flashes for the rival', () => {
 test('dig, exposure every other turn, steal on collision, extraction win', () => {
   const m = setup({ x: 2, y: 2 });
   submitOrders(m, 0, step(1, 1));
-  submitOrders(m, 1, step(-1, -1));
+  submitOrders(m, 1, step(-1, -1)); // B on 5,5
   submitOrders(m, 0, step(1, 1, 'dig')); // A on 2,2 digs
-  submitOrders(m, 1, step(-1, -1)); // B on 3,3
+  submitOrders(m, 1, step(-1, -1)); // B on 4,4
   assert.equal(m.carrier, 0);
   assert.ok(m.players[1].intel.some((e) => e.type === 'rivalPickup'));
   assert.ok(m.players[1].intel.some((e) => e.type === 'rivalSeen' && e.turn === 2));
   submitOrders(m, 0, stay);
+  submitOrders(m, 1, step(-1, -1)); // B on 3,3
+  submitOrders(m, 0, stay);
   submitOrders(m, 1, step(-1, -1)); // B steps onto A: steal
   assert.equal(m.carrier, 1);
   assert.ok(m.players[0].intel.some((e) => e.type === 'collision' && e.stolen));
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 4; i++) {
     submitOrders(m, 0, stay);
     submitOrders(m, 1, step(1, 1));
   }
@@ -93,7 +118,7 @@ test('draw after max turns', () => {
 test('rejects illegal orders', () => {
   const m = setup();
   assert.throws(() => submitOrders(m, 0, step(-1, 0)), /leaves the grid/);
-  assert.throws(() => submitOrders(m, 0, step(0, 0, 'viewkey', { x: 5, y: 5 })), /2×2/);
+  assert.throws(() => submitOrders(m, 0, step(0, 0, 'viewkey', { x: 6, y: 6 })), /2×2/);
   m.players[0].credits = 0;
   assert.throws(() => submitOrders(m, 0, step(0, 0, 'ping')), /credits/);
 });
@@ -123,6 +148,22 @@ test('bot vs bot matches always terminate', () => {
     outcomes[String(m.result?.winner)]++;
   }
   console.log('bot vs bot outcomes', outcomes);
+});
+
+test('neither seat is favoured: 3,000 bot games split close to evenly', () => {
+  const wins = [0, 0];
+  for (let k = 0; k < 3000; k++) {
+    const m = createMatch('S' + k);
+    addPlayer(m, { name: 'A' });
+    addPlayer(m, { name: 'B' });
+    while (m.phase === 'active') {
+      submitOrders(m, 0, botOrders(viewFor(m, 0)));
+      if (m.phase === 'active') submitOrders(m, 1, botOrders(viewFor(m, 1)));
+    }
+    if (m.result?.winner != null) wins[m.result.winner]++;
+  }
+  const share = wins[0] / (wins[0] + wins[1]);
+  assert.ok(share > 0.46 && share < 0.54, `seat 0 won ${(share * 100).toFixed(1)}%`);
 });
 
 test('chain: vault funded, turns anchored, winner claims, draws refund (mock ledger)', async () => {

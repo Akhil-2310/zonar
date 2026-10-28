@@ -1,7 +1,7 @@
 import Avatar from '@/components/Avatar';
 import CityMap, { CityLabels } from '@/components/CityMap';
 import { candidates, lastSeenRival, same } from '@/lib/belief';
-import { districtOf, tileName as fmt } from '@/lib/city';
+import { districtArea, districtOf, tileName as fmt } from '@/lib/city';
 import { inArea, lastTurn, type Draft } from '@/lib/game';
 import type { Area, GameView, IntelEvent, Pos } from '@/lib/types';
 
@@ -38,7 +38,7 @@ export default function Board({ view: v, draft, onCell }: { view: GameView; draf
   const dug = new Set(v.intel.flatMap((e) => (e.type === 'dig' && !e.found ? [fmt(e.at)] : [])));
   const aimArea: Area | null = !draft.target ? null
     : draft.action === 'viewkey' ? { ...draft.target, w: 2, h: 2 }
-    : { x: draft.target.x - (draft.target.x % 2), y: draft.target.y - (draft.target.y % 2), w: 2, h: 2 };
+    : districtArea(draft.target);
   const vkNow = v.intel.find((e): e is ViewKeyEvent => e.type === 'viewkey' && e.turn === lt);
 
   const cells = [];
@@ -93,7 +93,9 @@ export default function Board({ view: v, draft, onCell }: { view: GameView; draf
       <div className="absolute inset-0">
         <CityMap labels={false} />
       </div>
-      <div className="absolute inset-0 grid grid-cols-6 grid-rows-6">{cells}</div>
+      <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${v.size}, 1fr)`, gridTemplateRows: `repeat(${v.size}, 1fr)` }}>
+        {cells}
+      </div>
       <CityLabels />
     </div>
   );

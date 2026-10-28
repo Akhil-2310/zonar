@@ -1,6 +1,6 @@
 # Dead Drop (zonar)
 
-Two agents hunt a vault of **real Zcash testnet ZEC** buried in a surveilled 6×6 city. The winner sweeps the vault to their own address in one shielded transaction and keeps a relic, a collectible generated from the match's fairness commitment.
+Two agents hunt a vault of **real Zcash testnet ZEC** buried in the heart of a surveilled 7×7 city. The winner sweeps the vault to their own address in one shielded transaction and keeps a relic, a collectible generated from the match's fairness commitment.
 
 Requires Node 23.6+ (the server runs its TypeScript directly via Node's type stripping, no build step).
 
@@ -123,8 +123,9 @@ Everything is TypeScript in `strict` mode. Relative imports carry their `.ts` ex
 
 ## Rule choices
 
-- Distance is Chebyshev. Ping: Locked ≤1, Faint ≤3, Static beyond.
-- Costs: ping 1, leak 1, chaff 2, viewing key 4, dig free; 12 starting credits.
-- A leak flashes the sender's **district** (aligned 2×2 block). Chaff flashes any district.
-- Resolution order: spend → move → collision/steal → dig → intel → carrier exposure → win/draw. Simultaneous digs on the drop are decided by a coin flip.
-- The drop is never within 1 block of a safehouse.
+- **The city:** 7×7 tiles in 9 districts, sized 2-3-2 across each row and column, so the city has a true centre. The safehouses are A1 and G7.
+- **The drop:** always buried in the central district, Halo Spire (C3–E5). Every tile there mirrors another that is just as far from the other safehouse, and the centre tile D4 is 3 steps from both. Over 4,000 bot-vs-bot games each seat won about 50%.
+- **Distance:** Chebyshev (diagonal moves count as 1). Ping readings: Locked ≤1, Faint ≤3, Static beyond.
+- **Costs:** ping 1, leak 1, chaff 2, viewing key 4, dig free; 12 starting credits.
+- **Flashes:** a leak flashes the sender's whole **district**, and chaff flashes any district. Districts are 2×2, 2×3 or 3×3.
+- **Resolution order:** spend → move → collision/steal → dig → intel → carrier exposure → win/draw. Simultaneous digs on the drop are decided by a coin flip.

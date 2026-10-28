@@ -19,8 +19,9 @@ import type {
   View,
 } from '../lib/types.ts';
 import type { Wallet } from './ledger.ts';
+import { CITY_SIZE, VAULT_DISTRICT, districtArea } from '../lib/city.ts';
 
-export const SIZE = 6;
+export const SIZE = CITY_SIZE;
 export const MAX_TURNS = 20;
 export const START_CREDITS = 12;
 export const COSTS: Record<ActionId, number> = { none: 0, dig: 0, ping: 1, leak: 1, chaff: 2, viewkey: 4 };
@@ -95,19 +96,17 @@ export function pingReading(d: number): Reading {
   return 'Static';
 }
 
-// The coarse 2×2 block a leak (real or chaff) flashes on the rival's screen.
-export const regionOf = (p: Pos): Area => ({ x: p.x - (p.x % 2), y: p.y - (p.y % 2), w: 2, h: 2 });
+// A leak (real or chaff) flashes the whole district the tile is in on the rival's screen.
+export const regionOf = (p: Pos): Area => districtArea(p);
 
 export function commitmentOf(matchId: string, drop: Pos, salt: string): string {
   return crypto.createHash('sha256').update(`${matchId}|${drop.x},${drop.y}|${salt}`).digest('hex');
 }
 
 export function createMatch(id: string, rng: Rng = randomInt): Match {
-  let drop: Pos;
-  // Keep the drop off safehouses and at least 2 steps from either, so nobody spawns on it.
-  do {
-    drop = { x: rng(SIZE), y: rng(SIZE) };
-  } while (SAFEHOUSES.some((s) => dist(s, drop) < 2));
+  // The drop is always buried somewhere in the central vault district (C3–E5): each of
+  // its tiles mirrors another the same distance from the opposite safehouse.
+  const drop: Pos = { x: VAULT_DISTRICT.x + rng(VAULT_DISTRICT.w), y: VAULT_DISTRICT.y + rng(VAULT_DISTRICT.h) };
   const salt = crypto.randomBytes(16).toString('hex');
   return {
     id,

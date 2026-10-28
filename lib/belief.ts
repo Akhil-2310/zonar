@@ -1,6 +1,7 @@
 // Shared (browser + server) deduction helpers. Works only from one seat's own
 // intel, so the client's "possible drop" overlay and the bot see the same thing.
 import type { Dir, Pos, Reading, View } from './types.ts';
+import { inVaultDistrict } from './city.ts';
 
 export const dist = (a: Pos, b: Pos) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
 export const same = (a: Pos | null | undefined, b: Pos | null | undefined): boolean => !!a && !!b && a.x === b.x && a.y === b.y;
@@ -10,10 +11,9 @@ export const DIRS: Dir[] = [-1, 0, 1].flatMap((dy) => [-1, 0, 1].map((dx) => ({ 
 // Tiles where the (still buried) drop could be. Returns null once anyone has picked it up.
 export function candidates(view: View): Pos[] | null {
   if (view.you.carrying || view.rival?.carrying) return null;
-  const homes = [view.you.home, view.rival?.home].filter((h): h is Pos => !!h);
+  // Everyone knows the drop is somewhere in the vault district; intel narrows it from there.
   let tiles: Pos[] = [];
-  for (let y = 0; y < view.size; y++)
-    for (let x = 0; x < view.size; x++) if (homes.every((h) => dist(h, { x, y }) >= 2)) tiles.push({ x, y });
+  for (let y = 0; y < view.size; y++) for (let x = 0; x < view.size; x++) if (inVaultDistrict({ x, y })) tiles.push({ x, y });
 
   for (const ev of view.intel) {
     if (ev.type === 'ping') tiles = tiles.filter((t) => pingReading(dist(ev.at, t)) === ev.reading);

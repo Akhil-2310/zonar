@@ -1,6 +1,7 @@
-import { cityLayout } from '@/lib/city';
+import { VAULT_DISTRICT, cityLayout } from '@/lib/city';
 
-const city = cityLayout(6);
+const city = cityLayout();
+const V = { x: VAULT_DISTRICT.x * 100, y: VAULT_DISTRICT.y * 100, w: VAULT_DISTRICT.w * 100, h: VAULT_DISTRICT.h * 100 };
 const SHADES = ['#E7E0D2', '#DED6C6', '#EDE7DB'];
 const r1 = (n: number) => Math.round(n * 10) / 10;
 
@@ -45,6 +46,7 @@ export default function CityMap({ labels = true, className = '' }: { labels?: bo
       {city.cams.map((c, i) => (
         <circle key={i} cx={c.x} cy={c.y} r="3" fill="#E5484D" className="animate-cam" style={{ animationDelay: `${c.phase}s` }} />
       ))}
+      {labels && <rect x={V.x + 4} y={V.y + 4} width={V.w - 8} height={V.h - 8} rx="10" fill="none" stroke="#E0A419" strokeWidth="3" strokeDasharray="10 8" opacity="0.8" />}
       {labels &&
         city.labels.map((l) => (
           <text
@@ -70,10 +72,15 @@ export default function CityMap({ labels = true, className = '' }: { labels?: bo
 }
 
 // District names on their own layer so they sit above the fog.
+// District names and the vault district's outline, on their own layer above the fog.
 export function CityLabels() {
   const W = city.size;
   return (
     <svg viewBox={`0 0 ${W} ${W}`} className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden="true">
+      <rect x={V.x + 4} y={V.y + 4} width={V.w - 8} height={V.h - 8} rx="10" fill="none" stroke="#E0A419" strokeWidth="3" strokeDasharray="10 8" opacity="0.8" />
+      <text x={V.x + V.w / 2} y={V.y + V.h - 14} textAnchor="middle" className="font-mono" fontSize="9" fontWeight="700" letterSpacing="2" fill="#A87B0C" stroke="#FBF8F1" strokeWidth="4" paintOrder="stroke">
+        THE DROP IS IN HERE
+      </text>
       {city.labels.map((l) => (
         <text
           key={l.name}

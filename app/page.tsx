@@ -5,7 +5,7 @@ import Avatar from '@/components/Avatar';
 import HouseStatus from '@/components/HouseStatus';
 
 const STEPS = [
-  { n: '01', title: 'The drop is hidden', body: 'The server buries a vault of testnet ZEC on one of 36 blocks and publishes a hash of its location before anyone moves.' },
+  { n: '01', title: 'The drop is hidden', body: 'The server buries a vault of testnet ZEC somewhere in Halo Spire, the district at the city’s heart, and publishes a hash of its location before anyone moves.' },
   { n: '02', title: 'Hunt through the fog', body: 'Each turn both agents secretly pick a step and an action, then seal their orders. Turns resolve at the same moment.' },
   { n: '03', title: 'Carry it home', body: 'Dig it up and you turn partly transparent: your block leaks every other turn. Get caught on the same block and it’s stolen.' },
   { n: '04', title: 'Sweep the vault', body: 'Reach your safehouse and the vault is yours: one shielded transaction to your own wallet, plus a relic minted from the match.' },
@@ -85,7 +85,7 @@ export default function Landing() {
         <section className="border-y border-line bg-card/70">
           <div className="mx-auto grid max-w-6xl grid-cols-2 gap-6 px-5 py-8 md:grid-cols-5">
             {[
-              ['6×6', 'city blocks'],
+              ['7×7', 'city blocks'],
               ['9', 'districts'],
               ['20', 'turns max'],
               ['0.01 TAZ', 'per head-to-head win'],
@@ -171,10 +171,13 @@ export default function Landing() {
             </ol>
             <div className="rounded-3xl border border-line bg-gradient-to-b from-zec-soft to-card p-6 text-center shadow-sm">
               <div className="mx-auto flex h-40 w-40 items-center justify-center rounded-full border-4 border-zec bg-card shadow-[0_0_0_10px_rgb(244_183_40/0.15)]">
-                <div className="grid grid-cols-6 gap-1">
-                  {Array.from({ length: 36 }, (_, i) => (
-                    <span key={i} className={`h-3 w-3 rounded-[3px] ${i === 21 ? 'bg-zec' : 'bg-line'}`} />
-                  ))}
+                <div className="grid grid-cols-7 gap-1">
+                  {Array.from({ length: 49 }, (_, i) => {
+                    const x = i % 7;
+                    const y = Math.floor(i / 7);
+                    const vault = x >= 2 && x <= 4 && y >= 2 && y <= 4;
+                    return <span key={i} className={`h-2.5 w-2.5 rounded-[3px] ${i === 23 ? 'bg-zec' : vault ? 'bg-zec/35' : 'bg-line'}`} />;
+                  })}
                 </div>
               </div>
               <h3 className="mt-5 font-display text-lg font-semibold">The relic</h3>
@@ -215,20 +218,21 @@ function SectionHead({ eyebrow, title }: { eyebrow: string; title: string }) {
   );
 }
 
-// A static scene: your agent mid-hunt, a rival leak flashing, fog over the rest.
+// A static scene: your agent closing on the vault district, a rival leak flashing, fog over the rest.
 function HeroMap() {
-  const fogged = new Set([0, 1, 4, 5, 6, 10, 11, 17, 23, 24, 29, 30, 31, 34, 35]);
+  const fogged = new Set([0, 1, 7, 8, 5, 6, 12, 13, 19, 20, 26, 27, 28, 35, 36, 42, 43, 33, 34, 40, 41, 47, 48]);
+  const flash = new Set([5, 6, 12, 13]); // Sapling Row, top right
   return (
     <div className="relative">
       <div className="absolute -inset-4 -z-10 rounded-[2rem] bg-gradient-to-br from-zec/25 via-transparent to-rival/15 blur-2xl" />
       <div className="relative aspect-square overflow-hidden rounded-3xl border border-line bg-card shadow-[0_30px_80px_-30px_rgb(31_26_20/0.35)]">
         <CityMap />
-        <div className="absolute inset-0 grid grid-cols-6 grid-rows-6">
-          {Array.from({ length: 36 }, (_, i) => (
+        <div className="absolute inset-0 grid grid-cols-7 grid-rows-7">
+          {Array.from({ length: 49 }, (_, i) => (
             <div
               key={i}
               className={
-                i === 4 || i === 5 || i === 10 || i === 11
+                flash.has(i)
                   ? 'animate-flash bg-alert/20 ring-1 ring-alert/40 ring-inset'
                   : fogged.has(i)
                     ? 'fog-grain bg-paper/75'
@@ -237,10 +241,10 @@ function HeroMap() {
             />
           ))}
         </div>
-        <div className="absolute left-[30%] top-[46%] -translate-x-1/2 -translate-y-1/2 drop-shadow-lg">
+        <div className="absolute left-[21.4%] top-[35.7%] -translate-x-1/2 -translate-y-1/2 drop-shadow-lg">
           <Avatar id="nightjar" size={64} ring="you" />
         </div>
-        <div className="absolute left-[75%] top-[22%] -translate-x-1/2 -translate-y-1/2 opacity-80">
+        <div className="absolute left-[78.6%] top-[21.4%] -translate-x-1/2 -translate-y-1/2 opacity-80">
           <div className="rounded-full border-2 border-dashed border-rival p-0.5">
             <Avatar id="cipher" size={44} />
           </div>
@@ -249,7 +253,7 @@ function HeroMap() {
           <span>
             <b className="text-alert">Leak flash</b> <span className="text-muted">over Sapling Row. Real or chaff?</span>
           </span>
-          <span className="font-mono text-xs text-muted">T7/20</span>
+          <span className="font-mono text-xs text-muted">T4/20</span>
         </div>
       </div>
     </div>

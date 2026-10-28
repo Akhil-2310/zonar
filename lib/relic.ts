@@ -1,6 +1,6 @@
 // The winner's collectible: a vault relic whose art is derived from the
 // match's fairness commitment, so every relic is unique and verifiable.
-import { districtOf, tileName } from './city.ts';
+import { CITY_SIZE, districtOf, inVaultDistrict, tileName } from './city.ts';
 import type { Pos } from './types.ts';
 
 export type RelicInput = { matchId: string; commitment: string; drop: Pos; turn: number; codename: string; sweepTxid?: string; practice?: boolean };
@@ -18,12 +18,12 @@ export function relicSVG({ matchId, commitment, drop, turn, codename, sweepTxid,
       return `<line x1="${cx + Math.cos(a) * r1}" y1="${cy + Math.sin(a) * r1}" x2="${cx + Math.cos(a) * r2}" y2="${cy + Math.sin(a) * r2}" stroke="#E0A419" stroke-width="${1 + (b % 4)}" stroke-linecap="round" opacity="${0.45 + (b / 255) * 0.55}"/>`;
     })
     .join('');
-  // The 6×6 city as a grid of dots; the drop's tile is lit.
+  // The 7×7 city as a grid of dots: the vault district is tinted and the drop's tile is lit.
   const grid = [];
-  for (let y = 0; y < 6; y++)
-    for (let x = 0; x < 6; x++) {
-      const hit = x === drop.x && y === drop.y;
-      grid.push(`<rect x="${cx - 33 + x * 11}" y="${cy - 33 + y * 11}" width="8" height="8" rx="1.5" fill="${hit ? '#F4B728' : '#EADFC4'}"/>`);
+  for (let y = 0; y < CITY_SIZE; y++)
+    for (let x = 0; x < CITY_SIZE; x++) {
+      const fill = x === drop.x && y === drop.y ? '#F4B728' : inVaultDistrict({ x, y }) ? '#F3D98E' : '#EADFC4';
+      grid.push(`<rect x="${cx - 37 + x * 10.5}" y="${cy - 37 + y * 10.5}" width="7.5" height="7.5" rx="1.5" fill="${fill}"/>`);
     }
   const esc = (s: string | number) => String(s).replace(/[<>&"]/g, (c) => `&#${c.charCodeAt(0)};`);
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 520" width="400" height="520">

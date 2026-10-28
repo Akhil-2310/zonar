@@ -149,7 +149,7 @@ export default function Launch() {
             <div className="relative aspect-square">
               <CityMap />
               <div className="absolute inset-0 fog-grain bg-paper/40" />
-              <div className="absolute left-[8.3%] top-[8.3%] -translate-x-1/2 -translate-y-1/2 drop-shadow-lg">
+              <div className="absolute left-[7.14%] top-[7.14%] -translate-x-1/2 -translate-y-1/2 drop-shadow-lg">
                 <Avatar id={avatar} size={58} ring="you" />
               </div>
             </div>
