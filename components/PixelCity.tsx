@@ -190,7 +190,8 @@ export function PixelCityOverlay({ labels = true }: { labels?: boolean }) {
           row.map((name, bx) => {
             const x = (bands[bx][0] + bands[bx][1] / 2) * T;
             const vault = bx === 1 && by === 1;
-            const y = vault ? v.y + 4.4 : (bands[by][0] + bands[by][1] / 2) * T + 1;
+            // Along the top of each district, clear of the tile names in the bottom corners.
+            const y = vault ? v.y + 4.4 : bands[by][0] * T + (by === 0 ? 4.6 : 4.2) + (name.includes(' ') ? 2.1 : 0);
             // Two words, two lines: big enough to read, and inside the district.
             const lines = vault ? [name.toUpperCase()] : name.toUpperCase().split(' ');
             return (

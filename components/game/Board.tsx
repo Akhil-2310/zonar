@@ -66,13 +66,21 @@ export default function Board({ view: v, draft, onCell }: { view: GameView; draf
           {aimed && <span className="pointer-events-none absolute inset-0 bg-zec/35 outline outline-2 -outline-offset-2 outline-zec" />}
           {vkNow && inArea(vkNow.area, p) && <span className="pointer-events-none absolute inset-0 outline outline-2 -outline-offset-2 outline-zec-deep" />}
           {flashOld && <span className="pointer-events-none absolute inset-[6%] border-2 border-dotted border-alert/70" />}
+          {/* Every tile carries its name, A1 to G7 (the safehouses say it in their tag). */}
+          {!homeYou && !homeRival && <span
+            className={`pointer-events-none absolute bottom-[3%] left-[3%] z-20 rounded-[3px] px-[3px] font-tiny text-[11px] leading-[14px] ${
+              isYou || isDest ? 'bg-butter text-ink' : 'bg-[#f2f8e6]/80 text-lcd-ink'
+            }`}
+          >
+            {fmt(p)}
+          </span>}
           {isDest && <DestMarker />}
           {r && cands && <span className={`absolute right-[3%] top-[3%] z-20 rounded-[3px] border-2 border-lcd-ink px-1 font-tiny text-[12px] font-bold leading-[16px] shadow-[1px_1px_0_rgba(47,59,34,0.5)] ${READING[r.cls]}`}>{r.txt}</span>}
-          {dug.has(fmt(p)) && <span className="absolute bottom-[3%] right-[5%] z-20 font-tiny text-lg font-bold leading-none text-lcd-ink">×</span>}
+          {dug.has(fmt(p)) && <span className="absolute bottom-[2%] right-[5%] z-20 font-tiny text-lg font-bold leading-none text-lcd-ink">×</span>}
           {homeYou && !isYou && <Icon name="house" className="absolute h-[46%] w-[46%] opacity-90" />}
           {homeRival && (v.phase === 'over' ? !same(p, v.rival?.pos) : true) && <Icon name="house" className="absolute h-[46%] w-[46%] opacity-80 hue-rotate-[200deg]" />}
-          {homeYou && <span className="absolute bottom-[3%] z-20 rounded-[3px] border-2 border-ink bg-butter px-1 font-tiny text-[11px] leading-[14px] text-ink">HOME</span>}
-          {homeRival && <span className="absolute bottom-[3%] z-20 rounded-[3px] border-2 border-ink bg-sky px-1 font-tiny text-[11px] leading-[14px] text-ink">RIVAL</span>}
+          {homeYou && <span className="absolute bottom-[3%] z-20 rounded-[3px] border-2 border-ink bg-butter px-1 whitespace-nowrap font-tiny text-[11px] leading-[14px] text-ink">{fmt(p)} · HOME</span>}
+          {homeRival && <span className="absolute bottom-[3%] z-20 rounded-[3px] border-2 border-ink bg-sky px-1 whitespace-nowrap font-tiny text-[11px] leading-[14px] text-ink">{fmt(p)} · RIVAL</span>}
           <Token v={v} p={p} seen={seen} lt={lt} cands={cands} vkNow={vkNow} />
         </button>,
       );
