@@ -3,6 +3,11 @@ import { candidates, lastSeenRival, dist, same, DIRS } from '../lib/belief.ts';
 import type { Dir, OrdersInput, Pos, View } from '../lib/types.ts';
 
 const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+// Ties are broken at random: a fixed scan order would quietly favour one corner's player.
+const nearest = (from: Pos, tiles: Pos[]): Pos => {
+  const best = Math.min(...tiles.map((t) => dist(from, t)));
+  return pick(tiles.filter((t) => dist(from, t) === best));
+};
 
 export function botOrders(view: View): OrdersInput {
   const { you, size, costs, turn } = view;
@@ -38,19 +43,18 @@ export function botOrders(view: View): OrdersInput {
 
   const cands = candidates(view) ?? [];
   const center = { x: size >> 1, y: size >> 1 };
-  const target = cands.length ? cands.reduce((best, c) => (dist(you.pos, c) < dist(you.pos, best) ? c : best)) : center;
+  const target = cands.length ? nearest(you.pos, cands) : center;
   const move = toward(target);
   const next = after(move);
   const onCandidate = cands.some((c) => same(c, next));
 
   if (onCandidate && (cands.length <= 4 || you.credits === 0)) return { move, action: 'dig' };
   if (you.credits >= costs.viewkey && cands.length >= 6 && turn >= 3 && Math.random() < 0.3) {
-    let best = { x: 0, y: 0, n: -1 };
+    const anchors: (Pos & { n: number })[] = [];
     for (let y = 0; y < size - 1; y++)
-      for (let x = 0; x < size - 1; x++) {
-        const n = cands.filter((c) => c.x - x >= 0 && c.x - x < 2 && c.y - y >= 0 && c.y - y < 2).length;
-        if (n > best.n) best = { x, y, n };
-      }
+      for (let x = 0; x < size - 1; x++) anchors.push({ x, y, n: cands.filter((c) => c.x - x >= 0 && c.x - x < 2 && c.y - y >= 0 && c.y - y < 2).length });
+    const most = Math.max(...anchors.map((a) => a.n));
+    const best = pick(anchors.filter((a) => a.n === most));
     return { move, action: 'viewkey', target: { x: best.x, y: best.y } };
   }
   if (cands.length && you.credits > 6 && Math.random() < 0.1) {
