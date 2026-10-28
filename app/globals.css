@@ -1,59 +1,133 @@
 @import 'tailwindcss';
 
+/* Dead Drop runs on a toy: a pastel egg-shaped handheld with a colour LCD. */
 @theme {
-  --color-paper: #fbf8f1;
-  --color-paper-2: #f4efe3;
-  --color-card: #ffffff;
-  --color-line: #e8e1d2;
-  --color-ink: #1f1a14;
-  --color-muted: #6b6153;
-  --color-faint: #a39a89;
-  --color-zec: #f4b728;
-  --color-zec-soft: #fdf1cf;
-  --color-zec-deep: #a87b0c;
-  --color-rival: #2f6fed;
-  --color-rival-soft: #e3ecfd;
-  --color-alert: #e5484d;
-  --color-alert-soft: #fde8e8;
-  --color-ok: #2f9e5a;
+  --color-paper: #fff6ee;
+  --color-paper-2: #fdeadf;
+  --color-card: #fffdf9;
+  --color-line: #2b2238;
+  --color-ink: #2b2238;
+  --color-muted: #6f6382;
+  --color-faint: #a89cb8;
 
-  --font-display: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  /* shell pastels */
+  --color-shell: #ffc7da;
+  --color-shell-2: #ffe4ee;
+  --color-shell-deep: #f08db1;
+  --color-mint: #c9f2df;
+  --color-lilac: #e2d8ff;
+  --color-butter: #ffe9a3;
+  --color-sky: #cfe6ff;
+
+  /* the LCD */
+  --color-lcd: #d5e8bd;
+  --color-lcd-2: #bdd69f;
+  --color-lcd-ink: #2f3b22;
+  --color-lcd-mid: #6d8450;
+
+  --color-zec: #f4b728;
+  --color-zec-soft: #fff1c2;
+  --color-zec-deep: #a87b0c;
+  --color-rival: #5b8cff;
+  --color-rival-soft: #dde8ff;
+  --color-alert: #ff5f6d;
+  --color-alert-soft: #ffe1e4;
+  --color-ok: #3fae6a;
+
+  --font-display: var(--font-pixelify), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-pixelify), ui-sans-serif, system-ui, sans-serif;
+  --font-tiny: var(--font-silkscreen), ui-monospace, monospace;
   --font-mono: var(--font-jetbrains), ui-monospace, Menlo, monospace;
 
-  --animate-cam: cam 3s ease-in-out infinite;
-  --animate-flash: flash 0.9s ease-out 2;
-  --animate-bob: bob 1.6s ease-in-out infinite;
-  --animate-pulse-dot: pulse-dot 1.2s ease-in-out infinite;
+  --animate-cam: cam 3s steps(2) infinite;
+  --animate-flash: flash 0.5s steps(2) 4;
+  --animate-bob: bob 0.9s steps(2) infinite;
+  --animate-blink: blink 4s steps(1) infinite;
+  --animate-pulse-dot: pulse-dot 1.2s steps(2) infinite;
+  --animate-wobble: wobble 0.6s ease-in-out;
 
   @keyframes cam {
-    0%, 100% { opacity: 0.2; }
-    50% { opacity: 0.9; }
+    0%, 100% { opacity: 0.25; }
+    50% { opacity: 1; }
   }
   @keyframes flash {
-    from { background-color: rgb(229 72 77 / 0.55); }
+    0% { background-color: rgb(255 95 109 / 0.7); }
+    100% { background-color: rgb(255 95 109 / 0.2); }
   }
   @keyframes bob {
-    50% { transform: translateY(-3px); }
+    0% { transform: translateY(0); }
+    100% { transform: translateY(-6%); }
+  }
+  @keyframes blink {
+    0%, 96% { opacity: 1; }
+    97%, 100% { opacity: 0; }
   }
   @keyframes pulse-dot {
-    50% { opacity: 0.35; }
+    50% { opacity: 0.3; }
+  }
+  @keyframes wobble {
+    0%, 100% { transform: rotate(0); }
+    25% { transform: rotate(-2deg); }
+    75% { transform: rotate(2deg); }
   }
 }
 
 body {
-  background: var(--color-paper);
+  background-color: var(--color-paper);
+  background-image: radial-gradient(rgb(43 34 56 / 0.08) 1.5px, transparent 1.5px);
+  background-size: 18px 18px;
   color: var(--color-ink);
 }
 
-/* Fog grain over unseen blocks: a light mist rather than darkness. */
-.fog-grain {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 .55 0 0 0 0 .5 0 0 0 0 .42 0 0 0 .16 0'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
+/* Toy-plastic surfaces: thick ink outline, hard drop shadow. */
+.toy {
+  border: 3px solid var(--color-ink);
+  box-shadow: 4px 4px 0 var(--color-ink);
 }
-.hatch {
-  background-image: repeating-linear-gradient(45deg, transparent 0 7px, rgb(107 97 83 / 0.13) 7px 8px);
+.toy-sm {
+  border: 2px solid var(--color-ink);
+  box-shadow: 3px 3px 0 var(--color-ink);
 }
-.dot-grid {
-  background-image: radial-gradient(rgb(31 26 20 / 0.07) 1px, transparent 1px);
-  background-size: 22px 22px;
+/* Chunky buttons that press down. */
+.press {
+  transition: transform 0.06s, box-shadow 0.06s;
+}
+.press:hover:not(:disabled) {
+  transform: translate(-1px, -1px);
+  box-shadow: 5px 5px 0 var(--color-ink);
+}
+.press:active:not(:disabled) {
+  transform: translate(3px, 3px);
+  box-shadow: 1px 1px 0 var(--color-ink);
+}
+
+/* The LCD: pale mint glass with a faint pixel grid. */
+.lcd {
+  background-color: var(--color-lcd);
+  background-image:
+    linear-gradient(rgb(47 59 34 / 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(47 59 34 / 0.06) 1px, transparent 1px);
+  background-size: 5px 5px;
+  box-shadow: inset 0 0 0 3px rgb(47 59 34 / 0.12), inset 0 6px 18px rgb(47 59 34 / 0.18);
+}
+
+/* Fog on the LCD is a pixel dither: the more you know, the lighter it gets. */
+.dither-light {
+  background-image: conic-gradient(rgb(47 59 34 / 0.16) 25%, transparent 0 50%, transparent 0 75%, transparent 0);
+  background-size: 4px 4px;
+}
+.dither {
+  background-color: rgb(47 59 34 / 0.12);
+  background-image: conic-gradient(rgb(47 59 34 / 0.45) 25%, transparent 0 50%, rgb(47 59 34 / 0.45) 0 75%, transparent 0);
+  background-size: 4px 4px;
+}
+.dither-heavy {
+  background-color: rgb(47 59 34 / 0.3);
+  background-image: conic-gradient(rgb(47 59 34 / 0.62) 25%, transparent 0 50%, rgb(47 59 34 / 0.62) 0 75%, transparent 0);
+  background-size: 4px 4px;
+}
+
+.pixelated {
+  image-rendering: pixelated;
+  shape-rendering: crispEdges;
 }

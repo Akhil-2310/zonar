@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { agentRefill, agentStatus, createAgent, forgetAgent, revealSeed, storedAgent, type StoredAgent } from '@/lib/agent';
 import { taz } from '@/lib/api';
+import { Icon } from './Pixel';
 import type { AgentStatus } from '@/lib/types';
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -59,8 +60,8 @@ export default function AgentCard({ name, avatar, enabled, onChange }: { name: s
 
   if (!enabled) {
     return (
-      <div className="rounded-2xl border border-line bg-card p-4 text-sm text-muted">
-        <h3 className="font-display font-semibold text-ink">Agent wallet</h3>
+      <div className="toy rounded-2xl bg-card p-4 text-sm text-muted">
+        <h3 className="font-display text-lg font-bold text-ink">Agent wallet</h3>
         <p className="mt-1">On-chain moves need the testnet server with its transaction builder running.</p>
       </div>
     );
@@ -68,13 +69,16 @@ export default function AgentCard({ name, avatar, enabled, onChange }: { name: s
 
   if (!agent) {
     return (
-      <div className="rounded-2xl border border-zec/60 bg-zec-soft/50 p-4">
-        <h3 className="font-display font-semibold">Give your agent a wallet</h3>
+      <div className="toy rounded-2xl bg-butter p-4">
+        <div className="flex items-center gap-2">
+          <Icon name="lock" size={22} />
+          <h3 className="font-display text-lg font-bold">Give your agent a wallet</h3>
+        </div>
         <p className="mt-1 text-sm text-muted">
           A shielded testnet wallet that lives in this browser, locked by a passkey. In head-to-head matches every move becomes a
           shielded transaction you sign. The house funds your first {24} moves.
         </p>
-        <button onClick={create} disabled={!!step} className="mt-3 w-full rounded-xl bg-ink py-2.5 text-sm font-semibold text-paper disabled:opacity-60">
+        <button onClick={create} disabled={!!step} className="toy-sm press mt-3 w-full rounded-xl bg-ink py-2.5 font-bold text-paper disabled:opacity-60">
           {step || 'Create agent with a passkey'}
         </button>
         {err && <p className="mt-2 text-xs text-alert">{err}</p>}
@@ -84,27 +88,28 @@ export default function AgentCard({ name, avatar, enabled, onChange }: { name: s
 
   const refill = status?.refill;
   return (
-    <div className="rounded-2xl border border-line bg-card p-4">
+    <div className="toy rounded-2xl bg-card p-4">
       <div className="flex items-baseline justify-between">
-        <h3 className="font-display font-semibold">Agent wallet</h3>
-        <span className="font-mono text-[11px] text-ok">passkey-locked</span>
+        <h3 className="font-display text-lg font-bold">Agent wallet</h3>
+        <span className="toy-sm rounded-full bg-mint px-2 font-tiny text-[10px]">passkey-locked</span>
       </div>
       {status ? (
-        <div className="mt-2 flex items-baseline gap-2">
-          <span className="font-mono text-2xl font-bold">{status.movesFunded}</span>
-          <span className="text-sm text-muted">on-chain moves funded · {taz(status.spendableZat)}</span>
+        <div className="lcd mt-3 flex items-center gap-3 rounded-xl border-2 border-ink px-3 py-2 text-lcd-ink">
+          <Icon name="coin" size={26} />
+          <span data-testid="moves-funded" className="font-tiny text-3xl leading-none">{status.movesFunded}</span>
+          <span className="text-[13px] leading-tight">on-chain moves funded<br />{taz(status.spendableZat)}</span>
         </div>
       ) : (
-        <p className="mt-2 font-mono text-xs text-faint">Syncing your wallet…</p>
+        <p className="mt-2 font-tiny text-[11px] text-faint">Syncing your wallet…</p>
       )}
       {refill?.status === 'sending' && <p className="mt-1 text-xs text-zec-deep">The house is sending your moves…</p>}
       {refill?.status === 'sent' && status && status.movesFunded === 0 && <p className="mt-1 text-xs text-zec-deep">Funds sent. Spendable after one block (about 75 seconds).</p>}
       {refill?.status === 'failed' && <p className="mt-1 text-xs text-alert">{refill.error}</p>}
-      <div className="mt-3 flex flex-wrap gap-2 text-xs">
-        <button onClick={() => act(() => agentRefill(agent))} className="rounded-lg border border-line px-3 py-1.5 font-medium hover:border-faint">
+      <div className="mt-3 flex flex-wrap gap-2 text-[13px]">
+        <button onClick={() => act(() => agentRefill(agent))} className="toy-sm press rounded-lg bg-butter px-3 py-1 font-bold">
           Refill
         </button>
-        <button onClick={() => act(async () => setSeed(seed ? '' : await revealSeed(agent)))} className="rounded-lg border border-line px-3 py-1.5 font-medium hover:border-faint">
+        <button onClick={() => act(async () => setSeed(seed ? '' : await revealSeed(agent)))} className="toy-sm press rounded-lg bg-lilac px-3 py-1 font-bold">
           {seed ? 'Hide seed phrase' : 'Show seed phrase'}
         </button>
         <button
@@ -116,12 +121,12 @@ export default function AgentCard({ name, avatar, enabled, onChange }: { name: s
               onChange(null);
             }
           }}
-          className="ml-auto rounded-lg px-2 py-1.5 text-faint hover:text-alert"
+          className="ml-auto rounded-lg px-2 py-1 font-tiny text-[10px] uppercase text-faint hover:text-alert"
         >
           Forget
         </button>
       </div>
-      {seed && <p className="mt-3 rounded-lg bg-paper-2 p-3 font-mono text-xs leading-relaxed">{seed}</p>}
+      {seed && <p className="toy-sm mt-3 rounded-lg bg-paper p-3 font-mono text-xs leading-relaxed">{seed}</p>}
       {err && <p className="mt-2 text-xs text-alert">{err}</p>}
     </div>
   );
