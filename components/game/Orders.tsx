@@ -119,7 +119,7 @@ export default function Orders({ view: v, draft, aiming, onMove, onAction, onSea
       >
         {sealing || (v.you.locked ? (v.onchain.enabled ? 'Move signed and on-chain' : 'Orders sealed') : v.onchain.enabled ? 'Sign & send move' : 'Seal orders')}
       </button>
-      <p className="mt-2 text-center font-mono text-[10px] text-faint">Q W E / A S D / Z X C move · 1–6 act · ⏎ seal</p>
+      <p className="mt-2 text-center font-mono text-[10px] text-faint">← ↑ → ↓ or Q W E / A S D / Z X C move · 1–6 act · ⏎ seal</p>
     </div>
   );
 }

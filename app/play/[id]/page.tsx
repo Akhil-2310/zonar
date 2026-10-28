@@ -15,6 +15,15 @@ import { sealOnchain, storedAgent } from '@/lib/agent';
 import type { ActionId, Dir, GameView, Pos } from '@/lib/types';
 
 const freshDraft = (): Draft => ({ move: { dx: 0, dy: 0 }, action: 'ping', target: null });
+// Arrow keys nudge the chosen step one tile at a time: ↑ then → is the up-right diagonal,
+// and the opposite arrow steps back toward staying put.
+const ARROW_NUDGE: Record<string, Dir> = {
+  arrowup: { dx: 0, dy: -1 },
+  arrowdown: { dx: 0, dy: 1 },
+  arrowleft: { dx: -1, dy: 0 },
+  arrowright: { dx: 1, dy: 0 },
+};
+const clampStep = (n: number) => Math.max(-1, Math.min(1, n));
 
 export default function Game() {
   const id = String(useParams<{ id: string }>().id);
@@ -128,7 +137,15 @@ export default function Game() {
       if (!active || !view || (e.target as HTMLElement).tagName === 'INPUT') return;
       const k = e.key.toLowerCase();
       const mi = MOVE_KEYS.indexOf(k);
-      if (mi >= 0) {
+      const nudge = ARROW_NUDGE[k];
+      if (nudge) {
+        e.preventDefault(); // don't scroll the page while steering
+        setDraft((x) => {
+          const move = { dx: clampStep(x.move.dx + nudge.dx), dy: clampStep(x.move.dy + nudge.dy) };
+          const to = { x: view.you.pos.x + move.dx, y: view.you.pos.y + move.dy };
+          return to.x >= 0 && to.y >= 0 && to.x < view.size && to.y < view.size ? { ...x, move } : x;
+        });
+      } else if (mi >= 0) {
         const d = DIRS[mi];
         const to = { x: view.you.pos.x + d.dx, y: view.you.pos.y + d.dy };
         if (to.x >= 0 && to.y >= 0 && to.x < view.size && to.y < view.size) setMove(d);
