@@ -1,122 +1,143 @@
 # Deploying Zonar on AWS
 
-One AWS Lightsail server runs everything: the game, the zingo wallets and the transaction builder.
-A Lightsail **distribution** (CloudFront) sits in front of it and gives it a free HTTPS address like
-`https://d1abc23xyz.cloudfront.net`. That address is what you share with players, and passkeys work on it.
+One EC2 server runs everything: the game, the zingo wallets and the transaction builder.
+CloudFront sits in front of it and gives it a free HTTPS address like `https://d1abc23xyz.cloudfront.net`.
+That address is what you share with players, and passkeys work on it.
 
 ```
-Players ──HTTPS──▶ Lightsail distribution (d1abc….cloudfront.net) ──HTTP:80──▶ Lightsail server
-                                                                               ├─ Docker: Zonar
-                                                                               └─ ~/zonar/.wallets  ~/zonar/.data
+Players ──HTTPS──▶ CloudFront (d1abc….cloudfront.net) ──HTTP:80 + X-Origin-Secret──▶ EC2 t3.medium
+                                                                                     ├─ Docker: Zonar
+                                                                                     └─ ~/zonar/.wallets  ~/zonar/.data
 ```
 
-Time: about 45 minutes, most of it waiting for the first build. Cost: about $24/month for the server,
-plus the distribution plan (check Lightsail's pricing page).
+- **Only CloudFront can reach the server.** Its security group allows port 80 only from AWS's
+  managed CloudFront prefix list, and the server also refuses requests without the `X-Origin-Secret`
+  header. So nobody can skip CloudFront to fake their address and dodge the prize limits.
+- **Cost:** about $35/month (t3.medium, 30 GB gp3 disk, an Elastic IP). CloudFront is free at this scale.
 
 > **Pick your address once.** Passkey wallets are tied to the site's address. If you later move to a
-> different address (say, your own domain), players have to create new agents. Their funds are safe
-> if they saved their seed phrase.
+> different address (your own domain on the same CloudFront distribution, say), players have to create new
+> agents. Their funds are safe if they saved their seed phrase.
+
+The live deployment was made with the AWS CLI exactly as below (region `ap-south-1`). Every step can
+also be done in the AWS console.
 
 ---
 
-## 1. Create the server (about 5 minutes)
+## 1. Key pair and security group
 
-1. Open **https://lightsail.aws.amazon.com** and click **Create instance**.
-2. **Region:** the one closest to you and your players.
-3. **Platform:** Linux/Unix. **Blueprint:** *OS Only* → **Ubuntu 24.04 LTS**.
-4. **Plan:** the **4 GB RAM / 2 vCPU** plan, **dual-stack** (with a public IPv4). Smaller plans run out of memory while building.
-5. Name it `zonar` and click **Create instance**.
-6. Open the instance → **Networking**:
-   - **Create static IP** and attach it to `zonar`, so the address never changes.
-   - Under **IPv4 Firewall**, check that **SSH (22)** and **HTTP (80)** are listed. Add HTTP if it isn't.
+```bash
+export AWS_REGION=ap-south-1
+aws ec2 create-key-pair --key-name zonar --key-type ed25519 --query KeyMaterial --output text > ~/.ssh/zonar.pem
+chmod 400 ~/.ssh/zonar.pem
 
-## 2. Install and start the game (about 20 minutes, mostly waiting)
+VPC=$(aws ec2 describe-vpcs --filters Name=isDefault,Values=true --query 'Vpcs[0].VpcId' --output text)
+SG=$(aws ec2 create-security-group --group-name zonar --description "Zonar: SSH from admin, HTTP from CloudFront only" \
+  --vpc-id $VPC --query GroupId --output text)
+CF_LIST=$(aws ec2 describe-managed-prefix-lists \
+  --filters Name=prefix-list-name,Values=com.amazonaws.global.cloudfront.origin-facing --query 'PrefixLists[0].PrefixListId' --output text)
+aws ec2 authorize-security-group-ingress --group-id $SG \
+  --ip-permissions "IpProtocol=tcp,FromPort=80,ToPort=80,PrefixListIds=[{PrefixListId=$CF_LIST}]"
+aws ec2 authorize-security-group-ingress --group-id $SG --protocol tcp --port 22 --cidr "$(curl -s https://checkip.amazonaws.com)/32"
+```
 
-1. On the instance page, click **Connect using SSH**. A terminal opens in your browser.
-2. Paste:
+## 2. The server
 
-   ```bash
-   git clone https://github.com/Akhil-2310/zonar.git && cd zonar && sudo bash deploy/setup.sh
-   ```
+A boot script clones this repo, writes `.env` with a fresh origin secret and runs `deploy/setup.sh`
+(swap, Docker, build, start). The first build takes about 20 minutes.
 
-   The script:
-   - adds 4 GB of swap
-   - installs Docker
-   - creates `.env` with a random **origin secret**
-   - builds the image and starts the game
+```bash
+SECRET=$(openssl rand -hex 24)        # keep this: CloudFront needs it in step 3
+AMI=$(aws ssm get-parameter --name /aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id \
+  --query Parameter.Value --output text)
+cat > /tmp/zonar-boot.sh <<EOF
+#!/bin/bash
+set -e
+sudo -u ubuntu git clone https://github.com/Akhil-2310/zonar.git /home/ubuntu/zonar
+cd /home/ubuntu/zonar
+printf 'COMPOSE_FILE=docker-compose.prod.yml\nORIGIN_SECRET=$SECRET\n' > .env
+chown ubuntu:ubuntu .env && chmod 600 .env
+SUDO_USER=ubuntu bash deploy/setup.sh
+EOF
+ID=$(aws ec2 run-instances --image-id $AMI --instance-type t3.medium --key-name zonar --security-group-ids $SG \
+  --block-device-mappings 'DeviceName=/dev/sda1,Ebs={VolumeSize=30,VolumeType=gp3,DeleteOnTermination=false}' \
+  --user-data file:///tmp/zonar-boot.sh --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=zonar}]' \
+  --query 'Instances[0].InstanceId' --output text)
+aws ec2 wait instance-running --instance-ids $ID
 
-   When it finishes, it prints the house info and the **`X-Origin-Secret`** value. Copy that value; you need it in step 4.
-3. Lost the secret? Print it again with:
+ALLOC=$(aws ec2 allocate-address --query AllocationId --output text)
+aws ec2 associate-address --instance-id $ID --allocation-id $ALLOC
+DNS=$(aws ec2 describe-instances --instance-ids $ID --query 'Reservations[0].Instances[0].PublicDnsName' --output text)
+```
 
-   ```bash
-   grep ORIGIN_SECRET ~/zonar/.env
-   ```
+The disk is kept if the instance is ever terminated (`DeleteOnTermination=false`), because it holds the wallets.
 
-## 3. Bring your house wallet (about 5 minutes)
+## 3. CloudFront
 
-The house wallet pays for prize vaults and players' first moves.
+```bash
+cat > /tmp/zonar-cf.json <<EOF
+{
+  "CallerReference": "zonar-$(date +%s)",
+  "Comment": "Zonar",
+  "Enabled": true,
+  "PriceClass": "PriceClass_200",
+  "HttpVersion": "http2",
+  "Origins": { "Quantity": 1, "Items": [{
+    "Id": "zonar-ec2", "DomainName": "$DNS",
+    "CustomOriginConfig": { "HTTPPort": 80, "HTTPSPort": 443, "OriginProtocolPolicy": "http-only",
+      "OriginReadTimeout": 60, "OriginKeepaliveTimeout": 60,
+      "OriginSslProtocols": { "Quantity": 1, "Items": ["TLSv1.2"] } },
+    "CustomHeaders": { "Quantity": 1, "Items": [{ "HeaderName": "X-Origin-Secret", "HeaderValue": "$SECRET" }] }
+  }]},
+  "DefaultCacheBehavior": {
+    "TargetOriginId": "zonar-ec2",
+    "ViewerProtocolPolicy": "redirect-to-https",
+    "AllowedMethods": { "Quantity": 7, "Items": ["GET","HEAD","OPTIONS","PUT","PATCH","POST","DELETE"],
+      "CachedMethods": { "Quantity": 2, "Items": ["GET","HEAD"] } },
+    "CachePolicyId": "4135ea2d-6df8-44a3-9df3-4b5a84be39ad",
+    "OriginRequestPolicyId": "b689b0a8-53d0-40ab-baf2-68738e2966ac",
+    "Compress": false
+  }
+}
+EOF
+aws cloudfront create-distribution --distribution-config file:///tmp/zonar-cf.json \
+  --query 'Distribution.{id:Id,domain:DomainName}'
+```
 
-**Option A: move your existing funded house (recommended).**
+- `4135ea2d…` is the managed **CachingDisabled** policy: moves and the live match stream always reach the server.
+- `b689b0a8…` is the managed **AllViewerExceptHostHeader** policy: query strings and headers are passed through.
 
-1. On your computer, in the project folder:
+The distribution takes about 10 minutes to deploy. Then `https://<domain>` is the game.
 
-   ```bash
-   tar czf house.tgz .wallets/house
-   ```
+## 4. Bring your house wallet
 
-2. In the browser SSH window, click the **gear icon → Upload file** and choose `house.tgz`. It lands in the home folder.
-3. On the server:
+The house wallet pays for prize vaults and players' first moves. To keep using your funded one:
 
-   ```bash
-   cd ~/zonar && sudo bash deploy/import-house.sh ~/house.tgz
-   ```
+```bash
+# on your computer, in the project folder (stop any local copy of the game first)
+tar czf house.tgz .wallets/house
+scp -i ~/.ssh/zonar.pem house.tgz ubuntu@<elastic IP>:~
+ssh -i ~/.ssh/zonar.pem ubuntu@<elastic IP> 'cd zonar && sudo bash deploy/import-house.sh ~/house.tgz'
+```
 
-4. **Stop running the game on your computer from now on.** Two copies of one wallet spending at once will collide.
-
-**Option B: start fresh.** Skip this step. The server made a new house on first boot. After step 4,
-copy its address from the landing page and fund it from a testnet faucet.
-
-Don't copy `.wallets/agents`: those passkey wallets belong to `localhost` and won't work on the new address.
-
-## 4. HTTPS with a Lightsail distribution (about 10 minutes, plus up to 15 to go live)
-
-1. In Lightsail, open **Networking → Create distribution**.
-2. **Choose your origin:** the `zonar` instance. **Origin protocol policy:** *HTTP only*.
-3. **Caching:** choose **Cache nothing**, so moves and the live match stream always reach the server.
-4. **Advanced settings:**
-   - **Allowed HTTP methods:** *GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE*.
-   - **Forward query strings:** **All**. The live stream uses them.
-   - **Custom origin header:** name `X-Origin-Secret`, value = the secret from step 2.
-5. Pick the smallest plan, name it `zonar`, and click **Create distribution**.
-6. Wait until the status says **Enabled**, then copy the **default domain**, for example `d1abc23xyz.cloudfront.net`.
-
-The server refuses any request that doesn't carry the secret header, so visiting the static IP directly
-shows "Open Zonar through its public link." That's intended: it stops people bypassing CloudFront to fake their address.
+**Don't run the game locally on the same house wallet afterwards.** Two copies spending at once collide.
+To start fresh instead, skip this step and fund the address shown on the landing page from a testnet faucet.
 
 ## 5. Check it works
 
-1. Open `https://<your default domain>` and play a match against the bot.
-2. Create an agent wallet with your passkey. The house sends it 24 moves; they're spendable after about a block (~75 seconds).
-3. From a second device on a different network (a phone on mobile data), join a private match.
-   Each move should show up as an on-chain transaction, and the winner can claim the prize.
+1. Open `https://<domain>` and play a match against the bot.
+2. Create an agent wallet with your passkey. The house sends it 24 moves, spendable after about a block (~75 s).
+3. From a second device on another network (a phone on mobile data), join a private match.
+   Each move shows up as an on-chain transaction, and the winner can claim the prize.
 
-Same-network players still play, but as practice, because prizes need two different networks.
-
-## 6. Backups
-
-- **Lightsail snapshots:** instance → **Snapshots** → turn on **Automatic snapshots** (daily).
-- **Off-server copy** of the wallets, every so often:
-
-  ```bash
-  cd ~/zonar && sudo tar czf ~/zonar-wallets-$(date +%F).tgz .wallets .data
-  ```
-
-  Download it with the SSH window's **gear → Download file**.
-  `.wallets` holds the house seed and any unswept vaults; lose it and their testnet funds are gone.
+Players on the same network still play, but as practice: prizes need two different networks.
 
 ## Day-to-day
 
-From `~/zonar` on the server:
+```bash
+ssh -i ~/.ssh/zonar.pem ubuntu@<elastic IP>
+cd ~/zonar
+```
 
 | What | Command |
 |---|---|
@@ -124,13 +145,26 @@ From `~/zonar` on the server:
 | Restart | `docker compose restart` |
 | Update to the latest code | `git pull && docker compose up -d --build` |
 | Stop | `docker compose down` |
-| House balance | open the landing page |
+| First-boot progress | `sudo tail -f /var/log/cloud-init-output.log` |
 
 Matches and wallets survive restarts and updates; unfinished payouts resume on boot.
 
+SSH is allowed only from the IP you deployed from. From a new network, add your IP to the `zonar` security group.
+
+## Backups
+
+- **Disk snapshots:** EC2 → Elastic Block Store → **Lifecycle Manager** → create a daily snapshot policy for the instance's volume.
+- **Off-server copy** of the wallets, every so often:
+
+  ```bash
+  ssh -i ~/.ssh/zonar.pem ubuntu@<elastic IP> 'cd zonar && sudo tar czf - .wallets .data' > zonar-backup-$(date +%F).tgz
+  ```
+
+  `.wallets` holds the house seed and any unswept vaults; lose it and their testnet funds are gone.
+
 ## Settings
 
-Edit `docker-compose.prod.yml` (or add lines to `.env`), then run `docker compose up -d`.
+Edit `docker-compose.prod.yml` on the server (or add lines to `.env`), then `docker compose up -d`.
 
 | Setting | Default | What it does |
 |---|---|---|
@@ -140,10 +174,14 @@ Edit `docker-compose.prod.yml` (or add lines to `.env`), then run `docker compos
 | `TURN_SECONDS` | `60` | Turn clock (on-chain matches get 90) |
 | `ALLOW_SAME_IP` | `0` | `1` lets two tabs on one network play for prizes (testing only) |
 
+## Tearing it down
+
+Delete in this order: disable then delete the CloudFront distribution, terminate the instance, release the
+Elastic IP, and (once you've saved `.wallets`) delete the volume, the security group and the key pair.
+
 ## Troubleshooting
 
-- **The build stops with "killed" or out of memory:** check swap with `swapon --show`, then run `docker compose build` again.
-- **The distribution shows a 502 or 504 error:** check the game is up (`docker compose ps`) and that HTTP (80) is open in the instance firewall.
-- **"Open Zonar through its public link" on the CloudFront address:** the distribution's `X-Origin-Secret` doesn't match `.env`. Fix it in the distribution's settings.
+- **CloudFront shows 502 or 504:** check the game is up (`docker compose ps`), and that the instance's security group still allows port 80 from the CloudFront prefix list.
+- **"Open Zonar through its public link":** the request didn't carry the right `X-Origin-Secret`. Compare the distribution's origin header with `ORIGIN_SECRET` in `~/zonar/.env`.
+- **The build stops with "killed":** check swap with `swapon --show`, then `docker compose build` again.
 - **Passkey errors:** use the `https://…cloudfront.net` address, never the IP.
-- **Match stream keeps reconnecting:** make sure the distribution forwards **all query strings** and caches nothing.

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One-time setup for a fresh Ubuntu server (AWS Lightsail, 4 GB): installs Docker, adds swap
+# One-time setup for a fresh Ubuntu server (EC2 t3.medium, 4 GB): installs Docker, adds swap
 # for the Rust builds, writes .env with a fresh origin secret, then builds and starts Zonar.
 #
 #   git clone https://github.com/Akhil-2310/zonar.git && cd zonar && sudo bash deploy/setup.sh
@@ -40,7 +40,7 @@ if [ ! -f .env ]; then
   cat > .env <<EOF
 # Read by docker compose. Keep this file private.
 COMPOSE_FILE=docker-compose.prod.yml
-# CloudFront sends this as the X-Origin-Secret header (see DEPLOY.md, phase 4).
+# CloudFront sends this as the X-Origin-Secret header (see DEPLOY.md, step 3).
 ORIGIN_SECRET=$(openssl rand -hex 24)
 EOF
   chmod 600 .env
@@ -73,9 +73,8 @@ cat <<EOF
 
 Zonar is running.
 
-  Next: create the Lightsail distribution (DEPLOY.md, phase 4) with
-    Origin:                 this instance ($IP), HTTP only
-    Custom origin header:   X-Origin-Secret = $SECRET
+  CloudFront (DEPLOY.md, step 3) must point at this server ($IP) over HTTP
+  and send the custom origin header X-Origin-Secret with the ORIGIN_SECRET in .env.
 
   Useful commands (from $APP_DIR):
     docker compose logs -f --tail 100     # watch the server
