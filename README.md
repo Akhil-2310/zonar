@@ -6,6 +6,10 @@ Two agents drop into a surveilled pixel city. Somewhere in its glowing heart, a 
 
 **Play it now: https://dz1798t62xgz8.cloudfront.net**
 
+**Watch the demo:**
+
+[![Zonar demo video](https://img.youtube.com/vi/blbyJJmene4/maxresdefault.jpg)](https://youtu.be/blbyJJmene4)
+
 No sign-up, no download. Practice against the bot in a minute, then send a friend a link and play for a real testnet prize.
 
 ---
