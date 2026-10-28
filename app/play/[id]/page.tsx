@@ -5,7 +5,10 @@ import Link from 'next/link';
 import Logo from '@/components/Logo';
 import Board from '@/components/game/Board';
 import Orders from '@/components/game/Orders';
-import { Agents, Intel, Trail } from '@/components/game/Panels';
+import { Intel, PetStatus, RivalCard, Trail } from '@/components/game/Panels';
+import Device, { ScreenIcon } from '@/components/Device';
+import Avatar from '@/components/Avatar';
+import { Icon } from '@/components/Pixel';
 import { End, Waiting } from '@/components/game/Modals';
 import { DIRS } from '@/lib/belief';
 import { ACTIONS, MOVE_KEYS, needsAim, type Draft } from '@/lib/game';
@@ -161,81 +164,107 @@ export default function Game() {
   if (lost === 'gone') {
     return (
       <Centered>
-        <h1 className="font-display text-2xl font-bold">This match isn’t on this device.</h1>
+        <Avatar id="ghost" mood="sad" size={96} />
+        <h1 className="mt-4 font-display text-3xl font-bold">This match isn’t on this device.</h1>
         <p className="mt-2 text-muted">Match tokens live only in the browser that joined. If you were invited, join with the code.</p>
         <div className="mt-6 flex justify-center gap-3">
-          <Link href={`/play?join=${id}`} className="rounded-full bg-zec px-6 py-3 font-semibold">Join {id}</Link>
-          <Link href="/play" className="rounded-full border border-line bg-card px-6 py-3 font-semibold">New match</Link>
+          <Link href={`/play?join=${id}`} className="toy press rounded-full bg-zec px-6 py-3 font-bold">Join {id}</Link>
+          <Link href="/play" className="toy press rounded-full bg-card px-6 py-3 font-bold">New match</Link>
         </div>
       </Centered>
     );
   }
-  if (!view) return <Centered><p className="font-mono text-sm text-muted">Decrypting match {id}…</p></Centered>;
+  if (!view) {
+    return (
+      <Centered>
+        <Avatar id="nightjar" mood="sleepy" size={96} />
+        <p className="mt-4 font-tiny text-sm">Decrypting match {id}…</p>
+      </Centered>
+    );
+  }
 
   const v = view;
   const shown = Math.min(v.turn, v.maxTurns);
-  const status =
-    v.phase === 'waiting' ? 'Waiting for a rival agent…'
-    : v.phase === 'over' ? 'Match over.'
-    : v.you.locked ? (v.rival?.locked ? 'Resolving…' : `Orders sealed. Waiting on ${v.rival?.name}…`)
-    : v.you.carrying ? 'You carry the drop. Get it to your safehouse.'
-    : v.rival?.carrying ? 'The rival has the drop. Intercept them before they reach their safehouse.'
-    : 'Choose a step and an action, then seal your orders.';
   const vs = v.chain.vault.status;
   const mode = v.chain.mode ?? 'prize';
   const urgent = active && secondsLeft !== null && secondsLeft <= 10;
+  const affordable = ACTIONS.filter((a) => v.costs[a.id] <= v.you.credits);
+  const cycle = (dir: 1 | -1) => {
+    const i = affordable.findIndex((a) => a.id === draft.action);
+    setAction(affordable[(i + dir + affordable.length) % affordable.length].id);
+  };
+  const canSeal = active && !sealing && !(needsAim(draft.action) && !draft.target);
+
+  const actionRow = (
+    <div className="flex gap-1">
+      {ACTIONS.map((a) => (
+        <ScreenIcon key={a.id} label={`${a.label} (${v.costs[a.id] || 'free'})`} selected={draft.action === a.id} disabled={!active || v.costs[a.id] > v.you.credits} onClick={() => setAction(a.id)}>
+          <Icon name={a.id} size={22} />
+          <span className="font-tiny text-[8px] leading-none">{v.costs[a.id] ? `${v.costs[a.id]}♥` : 'free'}</span>
+        </ScreenIcon>
+      ))}
+    </div>
+  );
+  const statusRow = (
+    <div className="flex items-center justify-between gap-2 px-1 font-tiny text-[11px] text-lcd">
+      <span className="flex items-center gap-1.5">
+        <Icon name="clock" size={16} />
+        <span className={urgent ? 'animate-pulse-dot text-alert' : ''}>{v.phase === 'active' && secondsLeft !== null ? mmss(secondsLeft) : '--:--'}</span>
+      </span>
+      <span>
+        T{shown}/{v.maxTurns}
+      </span>
+      <span className="flex items-center gap-1.5">
+        <Icon name="coin" size={16} />
+        {mode === 'prize' ? taz(v.chain.prizeZat) : mode === 'practice' ? 'PRACTICE' : 'AT START'}
+        {mode === 'prize' && <span className={`h-2 w-2 ${vs === 'funded' ? 'bg-ok' : vs === 'failed' ? 'bg-alert' : 'animate-pulse-dot bg-zec'}`} />}
+      </span>
+      {v.you.locked && <Icon name="lock" size={16} title="orders sealed" />}
+    </div>
+  );
 
   return (
-    <div className="min-h-screen">
-      <header className="sticky top-0 z-30 border-b border-line bg-paper/90 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-3 px-5 py-3">
-          <Logo href="/" />
-          <div className="ml-2 flex flex-wrap gap-2">
-            <Chip label="match"><span className="tracking-[0.15em]">{v.matchId}</span></Chip>
-            <Chip label="turn">
-              {shown}/{v.maxTurns}
-              <span className="absolute bottom-0 left-0 h-0.5 bg-zec transition-all" style={{ width: `${(shown / v.maxTurns) * 100}%` }} />
-            </Chip>
-            {v.phase === 'active' && secondsLeft !== null && (
-              <Chip label="clock">
-                <span className={urgent ? 'text-alert' : ''}>{mmss(secondsLeft)}</span>
-              </Chip>
-            )}
-            <Chip label="vault">
-              {mode === 'prize' ? taz(v.chain.prizeZat) : mode === 'practice' ? 'practice' : 'at start'}
-              {mode === 'prize' && <span className={`h-2 w-2 rounded-full ${vs === 'funded' ? 'bg-ok' : vs === 'failed' ? 'bg-alert' : 'animate-pulse-dot bg-zec'}`} />}
-            </Chip>
-          </div>
-          <div className="ml-auto hidden gap-1.5 sm:flex">
-            {[v.chain.network, v.onchain.enabled ? 'on-chain moves' : 'shielded', '0 trackers'].map((t) => (
-              <span key={t} className="rounded-full border border-zec/50 bg-zec-soft px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-zec-deep">{t}</span>
-            ))}
-          </div>
+    <div className="min-h-screen pb-16">
+      <header className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-3 px-5 pt-5">
+        <Logo href="/" />
+        <span className="toy-sm rounded-full bg-card px-3 py-1 font-tiny text-[11px]">
+          match <b className="tracking-[0.2em]">{v.matchId}</b>
+        </span>
+        <div className="ml-auto flex flex-wrap gap-2">
+          {[v.chain.network, v.onchain.enabled ? 'on-chain moves' : 'shielded', '0 trackers'].map((t, i) => (
+            <span key={t} className={`toy-sm rounded-full px-3 py-0.5 font-tiny text-[10px] uppercase ${['bg-mint', 'bg-butter', 'bg-lilac'][i]}`}>
+              {t}
+            </span>
+          ))}
         </div>
       </header>
 
-      <main className="mx-auto grid max-w-7xl gap-6 px-5 py-6 lg:grid-cols-[minmax(0,1fr)_400px]">
-        <section className="space-y-3">
-          <div className="flex min-h-7 items-center justify-between gap-3">
-            <p className="font-medium">{status}</p>
-            {lost === 'retrying' && <span className="font-mono text-xs text-alert">reconnecting…</span>}
-            {error && <span className="font-mono text-xs text-alert">{error}</span>}
-          </div>
-          <div className="mx-auto max-w-[720px]">
+      <main className="mx-auto grid max-w-[1400px] items-start gap-6 px-5 pt-6 xl:grid-cols-[300px_minmax(0,640px)_360px] xl:justify-center">
+        <section className="order-1 xl:order-2">
+          <Device
+            top={actionRow}
+            bottom={statusRow}
+            buttons={[
+              { label: 'ACT', glyph: '◀', onClick: () => cycle(-1), disabled: !active },
+              { label: v.onchain.enabled ? 'SIGN' : 'SEAL', glyph: '●', big: true, onClick: seal, disabled: !canSeal },
+              { label: 'ACT', glyph: '▶', onClick: () => cycle(1), disabled: !active },
+            ]}
+          >
             <Board view={v} draft={draft} onCell={onCell} />
+          </Device>
+          <div className="mt-4 min-h-6 text-center">
+            {lost === 'retrying' && <span className="font-tiny text-xs text-alert">reconnecting…</span>}
+            {error && <span className="toy-sm inline-block rounded-lg bg-alert-soft px-3 py-1 text-sm text-alert">{error}</span>}
           </div>
-          <div className="flex flex-wrap justify-center gap-x-5 gap-y-1 text-xs text-muted">
-            <Legend className="bg-zec rounded-full">you</Legend>
-            <Legend className="bg-zec/20 ring-1 ring-zec/50">possible drop</Legend>
-            <Legend className="hatch bg-paper-2 ring-1 ring-line">ruled out</Legend>
-            <Legend className="bg-alert/40">leak flash</Legend>
-            <Legend className="rounded-full border border-dashed border-rival">rival last seen</Legend>
-            <Legend className="h-1.5 w-1.5 rounded-full bg-alert">surveillance</Legend>
-          </div>
+          <Legend />
         </section>
 
-        <aside className="space-y-4">
-          <Agents view={v} />
+        <aside className="order-2 space-y-5 xl:order-1">
+          <PetStatus view={v} draft={draft} />
+          <RivalCard view={v} />
+        </aside>
+
+        <aside className="order-3 space-y-5">
           <Orders view={v} draft={draft} aiming={aiming} onMove={setMove} onAction={setAction} onSeal={seal} secondsLeft={secondsLeft} sealing={sealing} />
           <Intel view={v} />
           <Trail view={v} onResign={() => session && confirm('Resign this match?') && api('/api/resign', session)} />
@@ -245,7 +274,7 @@ export default function Game() {
       {v.phase === 'waiting' && <Waiting view={v} />}
       {v.phase === 'over' && session && !modalClosed && <End view={v} session={session} onClose={() => setModalClosed(true)} />}
       {v.phase === 'over' && modalClosed && (
-        <button onClick={() => setModalClosed(false)} className="fixed bottom-6 right-6 z-40 rounded-full bg-ink px-5 py-3 font-semibold text-paper shadow-xl">
+        <button onClick={() => setModalClosed(false)} className="toy press fixed bottom-6 right-6 z-40 rounded-full bg-zec px-5 py-3 font-bold">
           Results & payout
         </button>
       )}
@@ -253,24 +282,31 @@ export default function Game() {
   );
 }
 
-function Chip({ label, children }: { label: string; children: ReactNode }) {
+function Legend() {
+  const items: [string, ReactNode][] = [
+    ['you', <span key="y" className="font-tiny text-xs text-zec-deep">▼</span>],
+    ['possible drop', <span key="p" className="lcd dither-light block h-4 w-4 border-2 border-ink" />],
+    ['ruled out', <span key="r" className="lcd dither-heavy block h-4 w-4 border-2 border-ink" />],
+    ['leak flash', <span key="l" className="block h-4 w-4 border-2 border-ink bg-alert/50" />],
+    ['vault district', <span key="v" className="block h-4 w-4 border-2 border-dashed border-zec bg-[#f6ebbf]" />],
+    ['surveillance', <span key="s" className="block h-2 w-2 bg-alert" />],
+  ];
   return (
-    <span className="relative flex items-center gap-2 overflow-hidden rounded-full border border-line bg-card px-3 py-1 font-mono text-sm font-semibold">
-      <span className="text-[10px] font-medium uppercase tracking-wider text-faint">{label}</span>
-      {children}
-    </span>
-  );
-}
-
-function Legend({ className, children }: { className: string; children: ReactNode }) {
-  return (
-    <span className="flex items-center gap-1.5">
-      <i className={`inline-block h-2.5 w-2.5 rounded-[3px] ${className}`} />
-      {children}
-    </span>
+    <div className="mx-auto mt-2 flex max-w-[640px] flex-wrap justify-center gap-x-4 gap-y-2 font-tiny text-[10px] uppercase text-muted">
+      {items.map(([label, swatch]) => (
+        <span key={label} className="flex items-center gap-1.5">
+          {swatch}
+          {label}
+        </span>
+      ))}
+    </div>
   );
 }
 
 function Centered({ children }: { children: ReactNode }) {
-  return <div className="dot-grid flex min-h-screen items-center justify-center p-6 text-center"><div>{children}</div></div>;
+  return (
+    <div className="flex min-h-screen items-center justify-center p-6 text-center">
+      <div className="flex flex-col items-center">{children}</div>
+    </div>
+  );
 }
