@@ -3,7 +3,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Logo from '@/components/Logo';
 import Avatar from '@/components/Avatar';
-import CityMap from '@/components/CityMap';
+import PixelCity from '@/components/PixelCity';
+import Device from '@/components/Device';
+import { Icon } from '@/components/Pixel';
 import HouseStatus from '@/components/HouseStatus';
 import AgentCard from '@/components/AgentCard';
 import type { StoredAgent } from '@/lib/agent';
@@ -54,39 +56,36 @@ export default function Launch() {
   }
 
   const chosen = AVATARS.find((a) => a.id === avatar) ?? AVATARS[0];
+  const tints = ['bg-butter', 'bg-sky', 'bg-mint', 'bg-shell', 'bg-paper-2', 'bg-lilac'];
 
   return (
-    <div className="dot-grid min-h-screen">
-      <header className="border-b border-line/70 bg-paper/85 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center px-5 py-3.5">
-          <Logo />
-          <span className="ml-auto font-mono text-xs text-muted">no account · nothing tracked</span>
-        </div>
+    <div className="min-h-screen pb-16">
+      <header className="mx-auto flex max-w-6xl items-center px-5 pt-5">
+        <Logo />
+        <span className="toy-sm ml-auto rounded-full bg-mint px-3 py-0.5 font-tiny text-[10px] uppercase">no account · nothing tracked</span>
       </header>
 
-      <main className="mx-auto grid max-w-6xl gap-10 px-5 py-12 lg:grid-cols-[1fr_420px]">
+      <main className="mx-auto grid max-w-6xl gap-10 px-5 pt-10 lg:grid-cols-[1fr_420px]">
         <section>
-          <p className="font-mono text-xs font-semibold uppercase tracking-[0.18em] text-zec-deep">Launch game</p>
-          <h1 className="mt-3 font-display text-4xl font-bold tracking-tight">Choose your agent.</h1>
-          <p className="mt-3 max-w-lg text-muted">Your avatar is the one thing your rival sees. Everything else stays shielded.</p>
+          <p className="font-tiny text-[11px] uppercase tracking-[0.2em] text-zec-deep">Launch game</p>
+          <h1 className="mt-2 font-display text-5xl font-bold leading-none">Hatch your agent.</h1>
+          <p className="mt-3 max-w-lg text-lg text-muted">Your pet is the one thing your rival sees. Everything else stays shielded.</p>
 
-          <div className="mt-8 grid grid-cols-3 gap-3 sm:grid-cols-6">
-            {AVATARS.map((a) => (
+          <div className="mt-8 grid grid-cols-3 gap-4 sm:grid-cols-6">
+            {AVATARS.map((a, i) => (
               <button
                 key={a.id}
                 onClick={() => setAvatar(a.id)}
-                className={`group flex flex-col items-center gap-2 rounded-2xl border bg-card p-3 transition ${
-                  avatar === a.id ? 'border-zec shadow-[0_0_0_3px_rgb(244_183_40/0.25)]' : 'border-line hover:border-faint'
-                }`}
+                className={`toy-sm press group flex flex-col items-center gap-1 rounded-[50%_50%_44%_44%/58%_58%_42%_42%] px-2 pb-3 pt-4 ${avatar === a.id ? 'bg-zec' : tints[i]}`}
               >
-                <Avatar id={a.id} size={64} className="transition group-hover:scale-105" />
-                <span className={`text-sm font-medium ${avatar === a.id ? 'text-ink' : 'text-muted'}`}>{a.name}</span>
+                <Avatar id={a.id} mood={avatar === a.id ? 'happy' : 'curious'} animate={avatar === a.id} size={60} />
+                <span className="font-tiny text-[10px] uppercase">{a.name}</span>
               </button>
             ))}
           </div>
 
           <label className="mt-8 block max-w-md">
-            <span className="font-mono text-xs font-semibold uppercase tracking-[0.14em] text-muted">Codename</span>
+            <span className="font-tiny text-[11px] uppercase tracking-[0.14em]">Codename</span>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -94,11 +93,11 @@ export default function Launch() {
               placeholder={chosen.name.toUpperCase()}
               autoComplete="off"
               spellCheck={false}
-              className="mt-2 w-full rounded-xl border border-line bg-card px-4 py-3 font-display text-lg outline-none transition focus:border-zec focus:shadow-[0_0_0_3px_rgb(244_183_40/0.2)]"
+              className="toy-sm lcd mt-2 w-full rounded-xl px-4 py-3 font-tiny text-xl uppercase text-lcd-ink outline-none placeholder:text-lcd-mid/60"
             />
           </label>
 
-          <div className="mt-8 grid max-w-2xl gap-3 sm:grid-cols-2">
+          <div className="mt-8 grid max-w-2xl gap-4 sm:grid-cols-2">
             <ModeCard
               title="Play vs bot"
               body={
@@ -106,8 +105,9 @@ export default function Launch() {
                   ? `GHOST plays from its own fog. A win pays ${taz(house.botPrizeZat)}.`
                   : 'Practice against GHOST, same rules as you. No ZEC at stake.'
               }
-              cta={busy === 'bot' ? 'Opening vault…' : 'Start'}
-              primary
+              cta={busy === 'bot' ? 'Hatching…' : 'Start'}
+              tint="bg-butter"
+              icon="star"
               disabled={!!busy}
               onClick={() => go('bot')}
             />
@@ -119,11 +119,13 @@ export default function Launch() {
                   : "Head-to-head. Today's prize budget is spent, so it's practice until tomorrow."
               }
               cta={busy === 'create' ? 'Opening vault…' : 'Create'}
+              tint="bg-lilac"
+              icon="chest"
               disabled={!!busy}
               onClick={() => go('create')}
             />
           </div>
-          <div className="mt-3 flex max-w-2xl gap-3">
+          <div className="mt-4 flex max-w-2xl gap-3">
             <input
               value={code}
               onChange={(e) => setCode(e.target.value.toUpperCase())}
@@ -131,41 +133,30 @@ export default function Launch() {
               placeholder="MATCH CODE"
               autoComplete="off"
               spellCheck={false}
-              className="flex-1 rounded-xl border border-line bg-card px-4 py-3 font-mono tracking-[0.3em] outline-none focus:border-zec"
+              className="toy-sm flex-1 rounded-xl bg-card px-4 py-3 font-tiny text-lg tracking-[0.3em] outline-none"
             />
-            <button
-              onClick={() => go('join')}
-              disabled={!!busy || code.length < 6}
-              className="rounded-xl border border-line bg-card px-6 font-semibold transition hover:border-faint disabled:opacity-40"
-            >
+            <button onClick={() => go('join')} disabled={!!busy || code.length < 6} className="toy-sm press rounded-xl bg-sky px-6 font-bold disabled:opacity-40">
               {busy === 'join' ? 'Joining…' : 'Join'}
             </button>
           </div>
-          {err && <p className="mt-3 text-sm text-alert">{err}</p>}
+          {err && <p className="toy-sm mt-3 inline-block rounded-lg bg-alert-soft px-3 py-1 text-sm text-alert">{err}</p>}
         </section>
 
-        <aside className="space-y-4">
-          <div className="overflow-hidden rounded-3xl border border-line bg-card shadow-sm">
-            <div className="relative aspect-square">
-              <CityMap />
-              <div className="absolute inset-0 fog-grain bg-paper/40" />
-              <div className="absolute left-[7.14%] top-[7.14%] -translate-x-1/2 -translate-y-1/2 drop-shadow-lg">
-                <Avatar id={avatar} size={58} ring="you" />
+        <aside className="space-y-5">
+          <Device shell="mint" brand={(name || chosen.name).toUpperCase()}>
+            <div className="lcd relative aspect-square overflow-hidden rounded-[10px]">
+              <PixelCity />
+              <div className="dither absolute inset-0" />
+              <div className="absolute left-[7.14%] top-[7.14%] h-[13%] w-[13%] -translate-x-1/2 -translate-y-1/2">
+                <Avatar id={avatar} mood="happy" className="h-full w-full" />
               </div>
             </div>
-            <div className="flex items-center gap-3 border-t border-line p-4">
-              <Avatar id={avatar} size={44} />
-              <div>
-                <div className="font-display font-semibold">{name || chosen.name.toUpperCase()}</div>
-                <div className="text-xs text-muted">Starts in the Sprout Docks safehouse · 12 shielded credits</div>
-              </div>
-            </div>
-          </div>
+          </Device>
           <AgentCard name={name || chosen.name.toUpperCase()} avatar={avatar} enabled={!!house?.agents} onChange={onAgent} />
           <HouseStatus />
-          <p className="px-1 text-xs leading-relaxed text-faint">
-            Your codename and avatar are stored only in this browser. If you win, you’ll be asked for a testnet address to
-            receive the vault. It’s deleted once the payout is sent.
+          <p className="px-1 text-[13px] leading-relaxed text-muted">
+            Your codename and pet are stored only in this browser. If you win, you’ll be asked for a testnet address to receive the vault.
+            It’s deleted once the payout is sent.
           </p>
         </aside>
       </main>
@@ -173,20 +164,17 @@ export default function Launch() {
   );
 }
 
-type ModeCardProps = { title: string; body: string; cta: string; primary?: boolean; disabled?: boolean; onClick: () => void };
+type ModeCardProps = { title: string; body: string; cta: string; tint: string; icon: string; disabled?: boolean; onClick: () => void };
 
-function ModeCard({ title, body, cta, primary = false, disabled = false, onClick }: ModeCardProps) {
+function ModeCard({ title, body, cta, tint, icon, disabled = false, onClick }: ModeCardProps) {
   return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={`flex flex-col items-start rounded-2xl border p-5 text-left transition disabled:opacity-60 ${
-        primary ? 'border-zec bg-zec-soft hover:bg-[#fbe7b0]' : 'border-line bg-card hover:border-faint'
-      }`}
-    >
-      <span className="font-display text-lg font-semibold">{title}</span>
-      <span className="mt-1 text-sm text-muted">{body}</span>
-      <span className={`mt-4 rounded-full px-4 py-1.5 text-sm font-semibold ${primary ? 'bg-ink text-paper' : 'bg-paper-2 text-ink'}`}>{cta} →</span>
+    <button onClick={onClick} disabled={disabled} className={`toy press flex flex-col items-start rounded-2xl p-5 text-left disabled:opacity-60 ${tint}`}>
+      <span className="flex items-center gap-2">
+        <Icon name={icon} size={24} />
+        <span className="font-display text-xl font-bold">{title}</span>
+      </span>
+      <span className="mt-1.5 text-[14px] leading-snug text-ink/75">{body}</span>
+      <span className="toy-sm mt-4 rounded-full bg-ink px-4 py-1 text-sm font-bold text-paper">{cta} →</span>
     </button>
   );
 }
