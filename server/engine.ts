@@ -1,4 +1,4 @@
-// Pure game rules for Dead Drop. No I/O here: the server owns transport,
+// Pure game rules for Zonar. No I/O here: the server owns transport,
 // the ledger owns money. Everything a player may learn flows through `intel`.
 import crypto from 'node:crypto';
 import type { ChainState, IntelEvent, Orders, OrdersInput, Phase, Pos, RecoveryInfo, Result, Seat, TranscriptEntry, View } from '../lib/types.ts';

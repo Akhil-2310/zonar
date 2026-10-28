@@ -28,6 +28,8 @@ export type StoredAgent = {
   createdAt: number;
 };
 
+// These storage keys and key-derivation labels predate the Zonar name. Changing them would
+// strand every existing agent wallet, so they stay.
 const STORE_KEY = 'deaddrop:agent';
 const te = new TextEncoder();
 const td = new TextDecoder();
@@ -105,7 +107,7 @@ async function createPasskey(label: string): Promise<{ id: Uint8Array; prf: Uint
   const cred = (await navigator.credentials.create({
     publicKey: {
       challenge: randomBytes(32) as BufferSource,
-      rp: { name: 'Dead Drop' },
+      rp: { name: 'Zonar' },
       user: { id: randomBytes(16) as BufferSource, name: label, displayName: label },
       pubKeyCredParams: [
         { type: 'public-key', alg: -7 },
@@ -126,7 +128,7 @@ async function createPasskey(label: string): Promise<{ id: Uint8Array; prf: Uint
 export async function createAgent(name: string, avatar: string, onStep: (s: string) => void = () => {}): Promise<StoredAgent> {
   if (!window.PublicKeyCredential) throw new Error('This browser has no passkey support.');
   onStep('Creating your passkey…');
-  const passkey = await createPasskey(name || 'Dead Drop agent');
+  const passkey = await createPasskey(name || 'Zonar agent');
   onStep('Generating your wallet…');
   await loadSigner();
   const acct = JSON.parse(signer.generateSeed(0)) as { mnemonic: string; ufvk: string; seed_fingerprint: string; account_index: number };

@@ -33,9 +33,9 @@ const PRIVACY = [
 ];
 
 const CHAIN = [
-  { label: 'Vault funded', memo: 'DEADDROP VAULT #A281A4 commit 45951e52…', note: 'A fresh wallet per match, funded with the prize. The memo carries the house’s commitment.' },
+  { label: 'Vault funded', memo: 'ZONAR VAULT #A281A4 commit 45951e52…', note: 'A fresh wallet per match, funded with the prize. The memo carries the house’s commitment.' },
   { label: 'Moves signed', memo: 'DD1|C1A4D7|T3|S0|1,1|ping|-|Vk2…', note: 'Each move is a zero-value shielded memo from your agent’s wallet to the vault, signed in your browser.' },
-  { label: 'Vault swept', memo: 'DEADDROP RELIC #A281A4 | Halo Spire D4 | T12', note: 'One send-all to the winner. The memo is the relic certificate.' },
+  { label: 'Vault swept', memo: 'ZONAR RELIC #A281A4 | Halo Spire D4 | T12', note: 'One send-all to the winner. The memo is the relic certificate.' },
 ];
 
 export default function Landing() {
@@ -214,7 +214,7 @@ export default function Landing() {
         </section>
       </main>
 
-      <footer className="pb-10 text-center font-tiny text-[10px] uppercase text-muted">Dead Drop · Zcash testnet · no cookies, no analytics</footer>
+      <footer className="pb-10 text-center font-tiny text-[10px] uppercase text-muted">Zonar · Zcash testnet · no cookies, no analytics</footer>
     </div>
   );
 }

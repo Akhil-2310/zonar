@@ -1,7 +1,7 @@
 {
   "name": "zonar",
   "version": "0.1.0",
-  "description": "Dead Drop - a two-player fog-of-war hunt for a hidden vault of ZEC",
+  "description": "Zonar - a two-player fog-of-war hunt for a hidden vault of ZEC",
   "type": "module",
   "private": true,
   "scripts": {

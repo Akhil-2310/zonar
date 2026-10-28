@@ -9,7 +9,7 @@ const silkscreen = Silkscreen({ subsets: ['latin'], weight: ['400', '700'], vari
 const mono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-jetbrains' });
 
 export const metadata: Metadata = {
-  title: 'Dead Drop',
+  title: 'Zonar',
   description: 'A pocket-sized fog-of-war hunt for a vault of Zcash testnet ZEC. Raise a pixel agent, sign every move, sweep the vault.',
   referrer: 'no-referrer',
 };

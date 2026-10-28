@@ -1,10 +1,10 @@
 [package]
-name = "deaddrop-builder"
+name = "zonar-builder"
 version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-description = "View-only wallets for Dead Drop player agents: builds and proves PCZTs that players sign in their browsers, then broadcasts them. Never holds a spending key."
+description = "View-only wallets for Zonar player agents: builds and proves PCZTs that players sign in their browsers, then broadcasts them. Never holds a spending key."
 
 [dependencies]
 anyhow.workspace = true

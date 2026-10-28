@@ -1,4 +1,4 @@
-// The rules of Dead Drop, shared by the server and the browser. The server resolves each
+// The rules of Zonar, shared by the server and the browser. The server resolves each
 // turn with `resolve`; when a match ends, each browser replays the revealed transcript
 // through the same `resolve` and checks that every clue it was shown is what the rules say.
 //

@@ -238,7 +238,7 @@ test('chain: vault funded, turns anchored, winner claims, draws refund (mock led
   chain.anchor(m);
   await tick();
   assert.equal(m.chain.anchors.at(-1)?.head, m.chainHead);
-  assert.match(ledger.txs.at(-1)?.memo ?? '', /DEADDROP #TEST T1 [0-9a-f]{64}/);
+  assert.match(ledger.txs.at(-1)?.memo ?? '', /ZONAR #TEST T1 [0-9a-f]{64}/);
   assert.equal(ledger.txs.at(-1)?.zat, 0, 'anchors carry no value, so nothing becomes dust');
 
   m.phase = 'over';
@@ -247,7 +247,7 @@ test('chain: vault funded, turns anchored, winner claims, draws refund (mock led
   assert.equal(m.vaultSeed?.seed.split(' ').length, 24);
   await assert.rejects(chain.claim(m, 'not-an-address', 'x'), /testnet address/);
   const payout = 'utest1' + 'q'.repeat(60);
-  await chain.claim(m, payout, 'DEADDROP RELIC');
+  await chain.claim(m, payout, 'ZONAR RELIC');
   await tick();
   assert.equal(m.chain.sweep?.status, 'sent');
   assert.equal(ledger.balances.get(payout), PRIZE_ZAT - 10_000);
@@ -277,7 +277,7 @@ test('chain: sweep waits for in-flight anchors and leaves the vault empty', asyn
   m.result = { winner: 0, reason: 'extracted' };
   await chain.settle(m);
   const payout = 'utest1' + 'w'.repeat(60);
-  await chain.claim(m, payout, 'DEADDROP RELIC');
+  await chain.claim(m, payout, 'ZONAR RELIC');
   const sweepStatus = () => m.chain.sweep?.status;
   assert.equal(sweepStatus(), 'confirming', 'holds while the anchor is still in flight');
   for (let i = 0; i < 100 && sweepStatus() !== 'sent'; i++) await tick(10);

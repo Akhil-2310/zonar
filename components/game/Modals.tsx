@@ -133,7 +133,7 @@ export function End({ view: v, session, onClose }: { view: GameView; session: Se
   function download() {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([relic], { type: 'image/svg+xml' }));
-    a.download = `dead-drop-relic-${v.matchId}.svg`;
+    a.download = `zonar-relic-${v.matchId}.svg`;
     a.click();
   }
 

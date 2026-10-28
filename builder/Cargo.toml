@@ -1,9 +1,9 @@
-# Dead Drop's transaction builder: a view-only wallet service for player agents.
+# Zonar's transaction builder: a view-only wallet service for player agents.
 # zebfin-signer and zebfin-wallet are vendored from the Zebfin project (same author),
 # with the Zcash pre-release pins and Cargo.lock kept identical.
 [workspace]
 resolver = "2"
-members = ["crates/zebfin-wallet", "crates/zebfin-signer", "crates/deaddrop-builder"]
+members = ["crates/zebfin-wallet", "crates/zebfin-signer", "crates/zonar-builder"]
 
 [workspace.package]
 edition = "2024"

@@ -173,7 +173,7 @@ export class Chain {
     match.chain.vault = { status: 'funding', address };
     this.onUpdate(match);
     const txid = await this.#houseJob('fund vault', () =>
-      this.house.send([{ address, zat: match.chain.prizeZat, memo: `DEADDROP VAULT #${match.id} commit ${match.commitment}` }]));
+      this.house.send([{ address, zat: match.chain.prizeZat, memo: `ZONAR VAULT #${match.id} commit ${match.commitment}` }]));
     this.#funded(match, txid);
   }
 
@@ -191,7 +191,9 @@ export class Chain {
   // A transfer this vault already made or received, identified by its memo.
   async #findTransfer(match: ChainMatch, kind: string, memoPrefix: string): Promise<Transfer | undefined> {
     const transfers = await this.#retry(() => this.#vault(match).transfers());
-    return transfers.find((t) => t.kind === kind && t.status !== 'failed' && (t.memos || []).some((m) => m.startsWith(memoPrefix)));
+    // Matches from before the rename wrote DEADDROP memos.
+    const prefixes = [memoPrefix, memoPrefix.replace(/^ZONAR/, 'DEADDROP')];
+    return transfers.find((t) => t.kind === kind && t.status !== 'failed' && (t.memos || []).some((m) => prefixes.some((p) => m.startsWith(p))));
   }
 
   resume(match: ChainMatch) {
@@ -206,7 +208,7 @@ export class Chain {
     (async () => {
       const v = match.chain.vault;
       if (v.status !== 'funded') {
-        const prior = v.address && (await this.#findTransfer(match, 'received', `DEADDROP VAULT #${match.id}`));
+        const prior = v.address && (await this.#findTransfer(match, 'received', `ZONAR VAULT #${match.id}`));
         if (prior) this.#funded(match, prior.txid);
         else await this.#fund(match);
       } else if (match.transcript.length && (match.chain.anchors.at(-1)?.turn ?? 0) < match.transcript.at(-1)!.turn) {
@@ -233,7 +235,7 @@ export class Chain {
       if (!address || (last && last.turn >= a.turn)) return;
       match.anchorInFlight = true;
       try {
-        const txid = await this.house.send([{ address, zat: ANCHOR_ZAT, memo: `DEADDROP #${match.id} T${a.turn} ${a.head}` }]);
+        const txid = await this.house.send([{ address, zat: ANCHOR_ZAT, memo: `ZONAR #${match.id} T${a.turn} ${a.head}` }]);
         match.chain.anchors.push({ turn: a.turn, head: a.head, txid });
       } finally {
         match.anchorInFlight = false;
@@ -269,7 +271,7 @@ export class Chain {
       } else if (match.chain.refund?.status !== 'sent') {
         match.chain.refund = { status: 'confirming' };
         this.onUpdate(match);
-        const memo = `DEADDROP REFUND #${match.id}`;
+        const memo = `ZONAR REFUND #${match.id}`;
         const prior = await this.#findTransfer(match, 'sent', memo);
         const txid = prior?.txid ?? (await this.#sweepWhenFunded(match, this.houseInfo.address ?? (await this.house.address()), memo));
         match.chain.refund = { status: 'sent', txid };
@@ -295,7 +297,7 @@ export class Chain {
   #runSweep(match: ChainMatch) {
     const payout = match.payout!;
     (async () => {
-      const prior = await this.#findTransfer(match, 'sent', `DEADDROP RELIC #${match.id}`);
+      const prior = await this.#findTransfer(match, 'sent', `ZONAR RELIC #${match.id}`);
       return prior?.txid ?? this.#sweepWhenFunded(match, payout.address, payout.memo);
     })()
       .then((txid) => {

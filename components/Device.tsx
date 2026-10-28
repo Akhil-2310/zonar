@@ -17,7 +17,7 @@ export default function Device({
   bottom,
   buttons,
   shell = 'pink',
-  brand = 'DEAD DROP',
+  brand = 'ZONAR',
   className = '',
 }: {
   children: ReactNode;

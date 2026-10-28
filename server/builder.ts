@@ -1,4 +1,4 @@
-// Runs and talks to deaddrop-builder, the Rust service holding view-only wallets for
+// Runs and talks to zonar-builder, the Rust service holding view-only wallets for
 // player agents. It builds and proves move transactions; players sign them in the browser.
 import { spawn, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs';

@@ -1,4 +1,4 @@
-// Pixel art for Dead Drop's toy look: pets (the agents), their moods, and icons.
+// Pixel art for Zonar's toy look: pets (the agents), their moods, and icons.
 // A sprite is rows of characters; each character is a palette key and '.' is empty.
 // Pets are built in layers: body, then gear, then the mood's eyes and mouth.
 

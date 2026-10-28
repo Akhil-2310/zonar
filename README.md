@@ -1,4 +1,4 @@
-# Dead Drop (zonar)
+# Zonar
 
 Two agents hunt a vault of **real Zcash testnet ZEC** buried in the heart of a surveilled 7×7 city. The winner sweeps the vault to their own address in one shielded transaction and keeps a relic, a collectible generated from the match's fairness commitment.
 
@@ -31,10 +31,10 @@ Pages: `/` landing, `/play` launch (codename + avatar), `/play/<code>` the match
 
 | When | Transaction | Memo |
 | --- | --- | --- |
-| Match created | house → fresh per-match **vault** wallet, prize amount | `DEADDROP VAULT #id commit <sha256>` |
-| After turns | house → vault, zero-value memo note, coalesced to the latest turn | `DEADDROP #id T<n> <hash-chain head>` |
+| Match created | house → fresh per-match **vault** wallet, prize amount | `ZONAR VAULT #id commit <sha256>` |
+| After turns | house → vault, zero-value memo note, coalesced to the latest turn | `ZONAR #id T<n> <hash-chain head>` |
 | Winner claims | vault → winner's address, everything (`send_all`), after anchoring finishes | the **relic** certificate |
-| Draw | vault → house (refund) | `DEADDROP REFUND #id` |
+| Draw | vault → house (refund) | `ZONAR REFUND #id` |
 
 - Gameplay never waits on blocks. Chain work runs in the background, and the "On-chain trail" panel links each txid to the testnet explorer.
 - **Jointly random drop.** Creating a match, the house publishes `sha256(match|house|secret)`. Each player's browser sends 32 random bytes when it creates or joins, and the drop is derived from the secret plus both entropies only once both seats are filled (`lib/rules.ts`), so neither the house nor either player picks it alone.
@@ -58,7 +58,7 @@ Wallet processes that die are restarted with backoff. Failed transmissions (e.g.
 Players can give their agent a wallet on the launch page. The design follows Zebfin (same author): **the server can build transactions but never spend.**
 
 - **Seed:** created in the browser by the Wasm signer (`public/signer`, built from `builder/crates/zebfin-signer`) and wrapped with XChaCha20-Poly1305 under a key from the passkey's WebAuthn PRF output. Only the wrapped seed is stored, in `localStorage`. Unlocking prompts for the passkey once per tab.
-- **Server side:** the game server gets the view-only key (UFVK) and the public half of an Ed25519 order key derived from the seed. `deaddrop-builder` (Rust, `builder/`, vendoring Zebfin's `zebfin-wallet`) keeps a view-only wallet per agent.
+- **Server side:** the game server gets the view-only key (UFVK) and the public half of an Ed25519 order key derived from the seed. `zonar-builder` (Rust, `builder/`, vendoring Zebfin's `zebfin-wallet`) keeps a view-only wallet per agent.
 - **Funding:** the house sends each new agent 24 notes of 10,000 zats, the exact fee for one move. Each move spends its own note, so moves don't wait for change to confirm. Refills are capped per player per day and by a daily budget.
 - **Each move in a head-to-head match between two agents:**
   1. The browser signs a memo `DD1|match|T<turn>|S<seat>|<move>|<action>|<target>|<ed25519 sig>`.
@@ -71,11 +71,11 @@ Players can give their agent a wallet on the launch page. The design follows Zeb
 The end-to-end test drives two headless browsers with virtual passkeys through this whole flow on testnet:
 
 ```
-npm run dev                      # testnet, with builder/target/release/deaddrop-builder built
+npm run dev                      # testnet, with builder/target/release/zonar-builder built
 node test/e2e/onchain.e2e.ts     # several minutes: refills and the claim wait for blocks
 ```
 
-Build the builder with `cargo build --release -p deaddrop-builder` in `builder/` (the Docker image does this).
+Build the builder with `cargo build --release -p zonar-builder` in `builder/` (the Docker image does this).
 
 ## Prizes, limits and the turn clock
 

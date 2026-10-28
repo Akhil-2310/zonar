@@ -62,12 +62,12 @@ const seatIps = new Map<string, string[]>();
 // Each refill is NOTE_ZAT-sized notes, one per on-chain move (a zero-value memo costs exactly the 10,000-zat fee).
 const NOTE_ZAT = 10_000;
 const REFILL_NOTES = env('AGENT_REFILL_NOTES', 24);
-const BUILDER_BIN = process.env.BUILDER_BIN || path.join(ROOT, 'builder/target/release/deaddrop-builder');
+const BUILDER_BIN = process.env.BUILDER_BIN || path.join(ROOT, 'builder/target/release/zonar-builder');
 const builder =
   !useMock && Builder.available(BUILDER_BIN)
     ? new Builder({ bin: BUILDER_BIN, dir: path.join(ROOT, '.wallets', 'agents'), lightwalletd: process.env.ZINGO_SERVER || 'https://testnet.zec.rocks:443' })
     : null;
-console.log(builder ? `Agent wallets: on (builder ${BUILDER_BIN})` : 'Agent wallets: off (needs testnet and the deaddrop-builder binary)');
+console.log(builder ? `Agent wallets: on (builder ${BUILDER_BIN})` : 'Agent wallets: off (needs testnet and the zonar-builder binary)');
 const agents = new AgentStore(path.join(ROOT, '.data', 'agents.json'));
 const drips = new DripPolicy(path.join(ROOT, '.data', 'drips.json'), {
   // Local development: every test player shares localhost, so the per-player cap is loose there.
@@ -344,7 +344,7 @@ const routes: Record<string, (body: Body, req: IncomingMessage) => unknown> = {
     const seat = seatFor(match, body.token);
     if (match.phase !== 'over' || match.result?.winner !== seat) throw new Error('only the winner can claim the vault');
     const me = match.players[seat];
-    const relic = `DEADDROP RELIC #${match.id} | ${districtOf(match.drop)} ${tileName(match.drop)} | T${match.turn} | ${me.name} | commit ${match.commitment}`;
+    const relic = `ZONAR RELIC #${match.id} | ${districtOf(match.drop)} ${tileName(match.drop)} | T${match.turn} | ${me.name} | commit ${match.commitment}`;
     await chain.claim(match, str(body.address).trim(), relic);
     return { ok: true };
   },
@@ -447,7 +447,7 @@ server.on('request', async (req: IncomingMessage, res: ServerResponse) => {
     send(res, err.status || 400, { error: err.message });
   }
 });
-server.listen(PORT, () => console.log(`Dead Drop running on http://localhost:${PORT}`));
+server.listen(PORT, () => console.log(`Zonar running on http://localhost:${PORT}`));
 
 for (const sig of ['SIGINT', 'SIGTERM'] as const) {
   process.on(sig, async () => {

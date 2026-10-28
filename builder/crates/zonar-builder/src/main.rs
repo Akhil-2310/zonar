@@ -1,4 +1,4 @@
-//! Dead Drop's transaction builder.
+//! Zonar's transaction builder.
 //!
 //! Each player agent is a view-only wallet here (its UFVK, never its seed). For every
 //! sealed move the game server asks for a PCZT paying a zero-value note with the move's
@@ -243,7 +243,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/builds/{id}/cancel", post(cancel))
         .with_state(app);
     let listener = tokio::net::TcpListener::bind(("127.0.0.1", port)).await?;
-    info!("deaddrop-builder listening on 127.0.0.1:{port} (lightwalletd {server})");
+    info!("zonar-builder listening on 127.0.0.1:{port} (lightwalletd {server})");
     axum::serve(listener, router).await?;
     Ok(())
 }

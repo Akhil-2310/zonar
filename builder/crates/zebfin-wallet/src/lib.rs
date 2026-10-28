@@ -59,7 +59,7 @@ const SYNC_BATCH_SIZE: u32 = 10_000;
 /// the standard 40-block transaction expiry.
 const INPUT_LOCK_BLOCKS: u32 = 45;
 
-/// Dead Drop: a player's notes are spendable after one confirmation, so a freshly funded
+/// Zonar: a player's notes are spendable after one confirmation, so a freshly funded
 /// agent can play within a block. (Upstream Zebfin uses the library default of 3/10.)
 const CONFIRMATIONS: ConfirmationsPolicy = ConfirmationsPolicy::MIN;
 

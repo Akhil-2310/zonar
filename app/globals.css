@@ -1,6 +1,6 @@
 @import 'tailwindcss';
 
-/* Dead Drop runs on a toy: a pastel egg-shaped handheld with a colour LCD. */
+/* Zonar runs on a toy: a pastel egg-shaped handheld with a colour LCD. */
 @theme {
   --color-paper: #fff6ee;
   --color-paper-2: #fdeadf;

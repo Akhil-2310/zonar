@@ -1,4 +1,4 @@
-# Dead Drop: Next.js app + game server + zingo-cli light wallet, in one image.
+# Zonar: Next.js app + game server + zingo-cli light wallet, in one image.
 #
 #   docker compose up --build
 #
@@ -25,15 +25,15 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
  && cargo build --release -p zingo-netutils --features nym --bin nym-proxy \
  && mkdir -p /out && cp target/release/zingo-cli target/release/nym-proxy /out/
 
-# ---------- deaddrop-builder (Rust): view-only wallets for player agents ----------
+# ---------- zonar-builder (Rust): view-only wallets for player agents ----------
 FROM rust:1-bookworm AS agents
 WORKDIR /src
 COPY builder ./builder
 WORKDIR /src/builder
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/src/builder/target \
-    cargo build --release -p deaddrop-builder \
- && mkdir -p /out && cp target/release/deaddrop-builder /out/
+    cargo build --release -p zonar-builder \
+ && mkdir -p /out && cp target/release/zonar-builder /out/
 
 # ---------- Next.js build ----------
 FROM node:24-bookworm-slim AS web
@@ -57,14 +57,14 @@ COPY server ./server
 COPY lib ./lib
 # zingo-cli looks for nym-proxy beside itself.
 COPY --from=zingo /out/zingo-cli /out/nym-proxy /usr/local/bin/
-COPY --from=agents /out/deaddrop-builder /usr/local/bin/
+COPY --from=agents /out/zonar-builder /usr/local/bin/
 RUN mkdir -p .wallets .data && chown -R node:node /app
 USER node
 
 ENV NODE_ENV=production \
     PORT=3000 \
     ZINGO_CLI=/usr/local/bin/zingo-cli \
-    BUILDER_BIN=/usr/local/bin/deaddrop-builder
+    BUILDER_BIN=/usr/local/bin/zonar-builder
 VOLUME ["/app/.wallets", "/app/.data"]
 EXPOSE 3000
 CMD ["node", "--disable-warning=ExperimentalWarning", "server/index.ts"]

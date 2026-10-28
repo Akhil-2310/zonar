@@ -36,7 +36,7 @@ export function relicSVG({ matchId, commitment, drop, turn, codename, sweepTxid,
   <circle cx="${cx}" cy="${cy}" r="86" fill="#FFFDF7" stroke="#E0A419" stroke-width="3"/>
   <circle cx="${cx}" cy="${cy}" r="76" fill="none" stroke="#E0A419" stroke-opacity=".35" stroke-dasharray="2 5"/>
   ${grid.join('')}
-  <text x="200" y="352" text-anchor="middle" font-family="ui-monospace,Menlo,monospace" font-size="13" letter-spacing="5" fill="#B7860B">DEAD DROP RELIC</text>
+  <text x="200" y="352" text-anchor="middle" font-family="ui-monospace,Menlo,monospace" font-size="13" letter-spacing="5" fill="#B7860B">ZONAR RELIC</text>
   <text x="200" y="384" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="22" font-weight="700" fill="#1F1A14">${esc(districtOf(drop))} · ${tileName(drop)}</text>
   <text x="200" y="410" text-anchor="middle" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#6B6153">match ${esc(matchId)} · extracted turn ${turn} · ${esc(codename)}</text>
   <text x="200" y="448" text-anchor="middle" font-family="ui-monospace,Menlo,monospace" font-size="9.5" fill="#9A8F7C">commit ${commitment.slice(0, 32)}</text>
