@@ -1,12 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createMatch, addPlayer, submitOrders, viewFor, commitmentOf, forfeit, expire, SAFEHOUSES, MAX_TURNS, type Match } from '../server/engine.ts';
+import { createMatch, addPlayer, submitOrders, viewFor, forfeit, expire, SAFEHOUSES, MAX_TURNS, type Match } from '../server/engine.ts';
 import { candidates } from '../lib/belief.ts';
 import { botOrders } from '../server/bot.ts';
 import { MockLedger, firstJSON } from '../server/ledger.ts';
 import { Chain, PRIZE_ZAT, type ChainMatch } from '../server/chain.ts';
 import { PrizePolicy, type PolicyConfig } from '../server/policy.ts';
 import fs from 'node:fs';
+import crypto from 'node:crypto';
+import { audit, dropFrom, houseCommitment, same } from '../lib/rules.ts';
 import os from 'node:os';
 import path from 'node:path';
 import type { ActionId, OrdersInput, Pos } from '../lib/types.ts';
@@ -24,16 +26,72 @@ function prize(chain: Chain, m: Match): ChainMatch {
 
 function setup(drop: Pos = { x: 3, y: 2 }): Match {
   const m = createMatch('TEST');
-  m.drop = drop;
-  m.commitment = commitmentOf(m.id, drop, m.salt);
   addPlayer(m, { name: 'A' });
   addPlayer(m, { name: 'B' });
+  m.drop = drop;
   return m;
 }
 
-test('commitment verifies against revealed drop', () => {
+test('the drop comes from the house secret and both players\' entropy, and only exists once both join', () => {
   const m = createMatch('X1');
-  assert.equal(m.commitment, commitmentOf('X1', m.drop, m.salt));
+  assert.equal(m.commitment, houseCommitment('X1', m.salt));
+  const [e0, e1] = ['a'.repeat(64), 'b'.repeat(64)];
+  addPlayer(m, { name: 'A', entropy: e0 });
+  assert.deepEqual(m.drop, { x: -1, y: -1 }, 'no drop while waiting');
+  addPlayer(m, { name: 'B', entropy: e1 });
+  assert.deepEqual(m.entropy, [e0, e1]);
+  assert.deepEqual(m.drop, dropFrom('X1', m.salt, [e0, e1]));
+  // Changing either player's entropy moves the drop somewhere (across many secrets).
+  let moved = 0;
+  for (let i = 0; i < 50; i++) {
+    const s = String(i).padStart(64, '0');
+    if (!same(dropFrom('X1', s, [e0, e1]), dropFrom('X1', s, [e0, 'c'.repeat(64)]))) moved++;
+  }
+  assert.ok(moved > 30);
+});
+
+test('a finished match replays in the browser audit: every clue, the chain, the drop', () => {
+  for (let k = 0; k < 40; k++) {
+    const m = createMatch('R' + k);
+    const mine = crypto.randomBytes(32).toString('hex');
+    addPlayer(m, { name: 'A', entropy: mine });
+    addPlayer(m, { name: 'B', isBot: true });
+    while (m.phase === 'active') {
+      for (const seat of [0, 1] as const) submitOrders(m, seat, botOrders(viewFor(m, seat)));
+    }
+    for (const seat of [0, 1] as const) {
+      const v = viewFor(m, seat);
+      const r = v.result!;
+      const a = audit({ matchId: m.id, commitment: v.commitment, chainHead: v.chainHead, drop: r.drop, salt: r.salt, entropy: r.entropy, transcript: r.transcript, result: r }, seat, v.intel, seat === 0 ? mine : null);
+      assert.deepEqual(a, { commitment: true, drop: true, myEntropy: seat === 0 ? true : null, chain: true, clues: true, clueCount: v.intel.length, firstBadTurn: null, outcome: true });
+    }
+  }
+});
+
+test('the audit catches a server that lies', () => {
+  const m = setup({ x: 3, y: 3 });
+  m.drop = dropFrom(m.id, m.salt, m.entropy!);
+  submitOrders(m, 0, step(1, 1, 'ping'));
+  submitOrders(m, 1, stay);
+  submitOrders(m, 0, step(1, 1, 'leak'));
+  submitOrders(m, 1, stay);
+  forfeit(m, 1);
+  const v = viewFor(m, 0);
+  const r = v.result!;
+  const reveal = { matchId: m.id, commitment: v.commitment, chainHead: v.chainHead, drop: r.drop, salt: r.salt, entropy: r.entropy, transcript: r.transcript, result: r };
+  assert.equal(audit(reveal, 0, v.intel).clues, true);
+  // A doctored leak distance.
+  const forged = v.intel.map((e) => (e.type === 'leak' ? { ...e, distance: e.distance + 1 } : e));
+  assert.deepEqual([audit(reveal, 0, forged).clues, audit(reveal, 0, forged).firstBadTurn], [false, 2]);
+  // A drop moved after the fact.
+  const moved = { ...reveal, drop: { x: r.drop.x === 2 ? 3 : 2, y: r.drop.y } };
+  assert.equal(audit(moved, 0, v.intel).drop, false);
+  // Entropy swapped for a value the house liked better.
+  assert.equal(audit(reveal, 0, v.intel, 'f'.repeat(64)).myEntropy, false);
+  // A rewritten turn.
+  const t = structuredClone(r.transcript);
+  t[0].orders[0].action = 'none';
+  assert.equal(audit({ ...reveal, transcript: t }, 0, v.intel).chain, false);
 });
 
 test('7×7 city: the drop is always in the vault district, which is fair to both safehouses', async () => {
@@ -41,6 +99,8 @@ test('7×7 city: the drop is always in the vault district, which is fair to both
   const seen = new Set<string>();
   for (let i = 0; i < 400; i++) {
     const m = createMatch('V' + i);
+    addPlayer(m, { name: 'A' });
+    addPlayer(m, { name: 'B' });
     assert.ok(inVaultDistrict(m.drop), `drop ${m.drop.x},${m.drop.y} outside the vault district`);
     seen.add(`${m.drop.x},${m.drop.y}`);
   }

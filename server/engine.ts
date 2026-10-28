@@ -1,32 +1,25 @@
 // Pure game rules for Dead Drop. No I/O here: the server owns transport,
 // the ledger owns money. Everything a player may learn flows through `intel`.
 import crypto from 'node:crypto';
-import type {
-  ActionId,
-  Area,
-  ChainState,
-  IntelBody,
-  IntelEvent,
-  Orders,
-  OrdersInput,
-  Phase,
-  Pos,
-  Reading,
-  RecoveryInfo,
-  Result,
-  Seat,
-  TranscriptEntry,
-  View,
-} from '../lib/types.ts';
+import type { ChainState, IntelEvent, Orders, OrdersInput, Phase, Pos, RecoveryInfo, Result, Seat, TranscriptEntry, View } from '../lib/types.ts';
 import type { Wallet } from './ledger.ts';
-import { CITY_SIZE, VAULT_DISTRICT, districtArea } from '../lib/city.ts';
+import {
+  ACTIONS,
+  COSTS,
+  MAX_TURNS,
+  SAFEHOUSES,
+  SIZE,
+  START_CREDITS,
+  chainStep,
+  dropFrom,
+  houseCommitment,
+  inBounds,
+  isEntropy,
+  other,
+  resolve,
+} from '../lib/rules.ts';
 
-export const SIZE = CITY_SIZE;
-export const MAX_TURNS = 20;
-export const START_CREDITS = 12;
-export const COSTS: Record<ActionId, number> = { none: 0, dig: 0, ping: 1, leak: 1, chaff: 2, viewkey: 4 };
-export const SAFEHOUSES: [Pos, Pos] = [{ x: 0, y: 0 }, { x: SIZE - 1, y: SIZE - 1 }];
-export const ACTIONS = Object.keys(COSTS) as ActionId[];
+export { ACTIONS, COSTS, MAX_TURNS, SAFEHOUSES, SIZE, START_CREDITS, dist, inBounds, pingReading, regionOf, same } from '../lib/rules.ts';
 
 export type Player = {
   seat: Seat;
@@ -49,9 +42,13 @@ export type Match = {
   createdAt: number;
   phase: Phase;
   turn: number;
+  // Set when the second seat fills, from the house secret and both players' entropy.
   drop: Pos;
+  // The house secret: committed to at creation, revealed when the match ends.
   salt: string;
   commitment: string;
+  // Each seat's entropy, as its browser sent it. Absent on matches from before jointly random drops.
+  entropy?: string[];
   carrier: Seat | null;
   carrierSince: number;
   // Hash chain over every turn's orders, seeded with the commitment. Anchored on-chain as it grows.
@@ -81,51 +78,29 @@ export type Match = {
 // One move as it went on-chain. The memo stays private until the match ends.
 export type OnchainMove = { turn: number; seat: Seat; txid: string; memo: string };
 
-type Rng = (max: number) => number;
-const randomInt: Rng = (max) => crypto.randomInt(max);
-
-export const inBounds = (p: Pos) => p.x >= 0 && p.y >= 0 && p.x < SIZE && p.y < SIZE;
-export const same = (a: Pos, b: Pos) => a.x === b.x && a.y === b.y;
-// Moves are one step in any of 8 directions, so Chebyshev distance is "turns away".
-export const dist = (a: Pos, b: Pos) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
-const other = (seat: Seat): Seat => (seat === 0 ? 1 : 0);
-
-export function pingReading(d: number): Reading {
-  if (d <= 1) return 'Locked';
-  if (d <= 3) return 'Faint';
-  return 'Static';
-}
-
-// A leak (real or chaff) flashes the whole district the tile is in on the rival's screen.
-export const regionOf = (p: Pos): Area => districtArea(p);
-
-export function commitmentOf(matchId: string, drop: Pos, salt: string): string {
-  return crypto.createHash('sha256').update(`${matchId}|${drop.x},${drop.y}|${salt}`).digest('hex');
-}
-
-export function createMatch(id: string, rng: Rng = randomInt): Match {
-  // The drop is always buried somewhere in the central vault district (C3–E5): each of
-  // its tiles mirrors another the same distance from the opposite safehouse.
-  const drop: Pos = { x: VAULT_DISTRICT.x + rng(VAULT_DISTRICT.w), y: VAULT_DISTRICT.y + rng(VAULT_DISTRICT.h) };
-  const salt = crypto.randomBytes(16).toString('hex');
+export function createMatch(id: string): Match {
+  const salt = crypto.randomBytes(32).toString('hex');
+  const commitment = houseCommitment(id, salt);
   return {
     id,
     createdAt: Date.now(),
     phase: 'waiting',
     turn: 1,
-    drop,
+    drop: { x: -1, y: -1 },
     salt,
-    commitment: commitmentOf(id, drop, salt),
+    commitment,
+    entropy: [],
     carrier: null,
     carrierSince: 0,
-    chainHead: commitmentOf(id, drop, salt),
+    chainHead: commitment,
     transcript: [],
     players: [],
     result: null,
   };
 }
 
-export function addPlayer(match: Match, { name, isBot = false }: { name?: string; isBot?: boolean }): Player {
+// `entropy` is the joining browser's own randomness; the server makes some up for bots and old clients.
+export function addPlayer(match: Match, { name, isBot = false, entropy }: { name?: string; isBot?: boolean; entropy?: string }): Player {
   if (match.players.length >= 2) throw new Error('match is full');
   const seat = match.players.length as Seat;
   const player: Player = {
@@ -139,7 +114,12 @@ export function addPlayer(match: Match, { name, isBot = false }: { name?: string
     intel: [],
   };
   match.players.push(player);
-  if (match.players.length === 2) match.phase = 'active';
+  if (match.entropy) match.entropy.push(isEntropy(entropy) ? entropy : crypto.randomBytes(32).toString('hex'));
+  if (match.players.length === 2) {
+    // Both entropies are in: only now does the drop exist.
+    if (match.entropy) match.drop = dropFrom(match.id, match.salt, match.entropy);
+    match.phase = 'active';
+  }
   return player;
 }
 
@@ -172,83 +152,16 @@ export function submitOrders(match: Match, seat: Seat, orders: unknown): { turn:
   return match.players.every((p) => p.pending) ? resolveTurn(match) : null;
 }
 
-const dropPos = (m: Match): Pos => (m.carrier === null ? m.drop : m.players[m.carrier].pos);
-
-// Resolution order: spend → move → collision → dig → intel actions → exposure → win/draw.
-export function resolveTurn(match: Match, rng: Rng = randomInt): { turn: number } {
+export function resolveTurn(match: Match): { turn: number } {
   const t = match.turn;
-  const [a, b] = match.players;
   const orders = match.players.map((p) => p.pending as Orders);
-  const log = (p: Player, ev: IntelBody) => p.intel.push({ turn: t, ...ev });
-
-  match.players.forEach((p, i) => {
-    p.credits -= COSTS[orders[i].action];
-    p.pos = { x: p.pos.x + orders[i].move.dx, y: p.pos.y + orders[i].move.dy };
-  });
-
-  if (same(a.pos, b.pos)) {
-    if (match.carrier !== null) {
-      const thief = other(match.carrier);
-      match.carrier = thief;
-      match.carrierSince = t;
-      for (const p of match.players) log(p, { type: 'collision', at: { ...p.pos }, stolen: true, carrier: thief === p.seat });
-    } else {
-      for (const p of match.players) log(p, { type: 'collision', at: { ...p.pos }, stolen: false, carrier: false });
-    }
-  }
-
-  const diggers = match.players.filter((_, i) => orders[i].action === 'dig');
-  const winners = match.carrier === null ? diggers.filter((p) => same(p.pos, match.drop)) : [];
-  // Two agents digging the same tile in the same instant: a coin flip decides who grabs it.
-  const finder = winners.length ? winners[winners.length > 1 ? rng(winners.length) : 0] : null;
-  for (const p of diggers) log(p, { type: 'dig', at: { ...p.pos }, found: p === finder });
-  if (finder) {
-    match.carrier = finder.seat;
-    match.carrierSince = t;
-    log(match.players[other(finder.seat)], { type: 'rivalPickup' });
-  }
-
-  match.players.forEach((p, i) => {
-    const o = orders[i];
-    const rival = match.players[other(p.seat)];
-    if (o.action === 'ping') {
-      log(p, { type: 'ping', at: { ...p.pos }, reading: pingReading(dist(p.pos, dropPos(match))) });
-    } else if (o.action === 'leak') {
-      log(p, { type: 'leak', at: { ...p.pos }, distance: dist(p.pos, dropPos(match)) });
-      log(rival, { type: 'flash', region: regionOf(p.pos) });
-    } else if (o.action === 'chaff' && o.target) {
-      log(p, { type: 'chaffPlanted', region: regionOf(o.target) });
-      log(rival, { type: 'flash', region: regionOf(o.target) });
-    } else if (o.action === 'viewkey' && o.target) {
-      const area: Area = { x: o.target.x, y: o.target.y, w: 2, h: 2 };
-      const inArea = (q: Pos) => q.x >= area.x && q.x < area.x + 2 && q.y >= area.y && q.y < area.y + 2;
-      log(p, {
-        type: 'viewkey',
-        area,
-        drop: match.carrier === null && inArea(match.drop) ? { ...match.drop } : null,
-        rival: inArea(rival.pos) ? { ...rival.pos } : null,
-      });
-    }
-  });
-
-  // A carrier is partly transparent: their tile leaks to the rival every other turn, starting on pickup.
-  if (match.carrier !== null && (t - match.carrierSince) % 2 === 0) {
-    const c = match.players[match.carrier];
-    log(match.players[other(match.carrier)], { type: 'rivalSeen', at: { ...c.pos } });
-    log(c, { type: 'exposed', at: { ...c.pos } });
-  }
-
-  match.transcript.push({ turn: t, orders });
-  match.chainHead = crypto.createHash('sha256').update(match.chainHead + JSON.stringify({ turn: t, orders })).digest('hex');
+  const result = resolve(match, t, orders);
+  const entry = { turn: t, orders };
+  match.transcript.push(entry);
+  match.chainHead = chainStep(match.chainHead, entry);
   for (const p of match.players) p.pending = null;
-
-  if (match.carrier !== null && same(match.players[match.carrier].pos, SAFEHOUSES[match.carrier])) {
-    finish(match, { winner: match.carrier, reason: 'extracted' });
-  } else if (t >= MAX_TURNS) {
-    finish(match, { winner: null, reason: 'timeout' });
-  } else {
-    match.turn += 1;
-  }
+  if (result) finish(match, result);
+  else match.turn += 1;
   return { turn: t };
 }
 
@@ -305,6 +218,6 @@ export function viewFor(match: Match, seat: Seat): View {
         }
       : null,
     intel: me.intel,
-    result: over ? { ...over, drop: match.drop, salt: match.salt, transcript: match.transcript } : null,
+    result: over ? { ...over, drop: match.drop, salt: match.salt, entropy: match.entropy, transcript: match.transcript } : null,
   };
 }

@@ -100,7 +100,7 @@ export type View = {
     avatar?: string;
   } | null;
   intel: IntelEvent[];
-  result: (Result & { drop: Pos; salt: string; transcript: TranscriptEntry[]; vaultSeed?: RecoveryInfo }) | null;
+  result: (Result & { drop: Pos; salt: string; entropy?: string[]; transcript: TranscriptEntry[]; vaultSeed?: RecoveryInfo }) | null;
 };
 
 // Turn clock. `now` is the server's time when the view was sent, so clients can correct for skew.

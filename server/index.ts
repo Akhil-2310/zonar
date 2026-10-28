@@ -125,10 +125,10 @@ function changed(match: ChainMatch) {
   for (const { seat, res } of streams.get(match.id) ?? []) res.write(`data: ${JSON.stringify(fullView(match, seat))}\n\n`);
 }
 
-type Joiner = { name?: string; avatar?: string; isBot?: boolean; ip?: string; agentId?: string };
+type Joiner = { name?: string; avatar?: string; isBot?: boolean; ip?: string; agentId?: string; entropy?: string };
 
-function join(match: ChainMatch, { name, avatar, isBot = false, ip, agentId }: Joiner): Player {
-  const p = addPlayer(match, { name, isBot });
+function join(match: ChainMatch, { name, avatar, isBot = false, ip, agentId, entropy }: Joiner): Player {
+  const p = addPlayer(match, { name, isBot, entropy });
   p.avatar = avatar && AVATAR_IDS.includes(avatar) ? avatar : AVATAR_IDS[(match.players.length * 3) % AVATAR_IDS.length];
   p.agentId = agentId;
   if (!isBot) seatIps.set(match.id, [...(seatIps.get(match.id) ?? []), ip ?? 'unknown']);
@@ -226,14 +226,14 @@ const routes: Record<string, (body: Body, req: IncomingMessage) => unknown> = {
     const agentId = joiningAgent(body);
     const match = chain.pending(createMatch(newId()));
     matches.set(match.id, match);
-    const p = join(match, { name: str(body.name), avatar: str(body.avatar), ip: clientIp(req), agentId });
+    const p = join(match, { name: str(body.name), avatar: str(body.avatar), ip: clientIp(req), agentId, entropy: str(body.entropy) });
     if (body.vsBot) join(match, { name: 'GHOST', avatar: 'ghost', isBot: true });
     changed(match);
     return { matchId: match.id, token: p.token, seat: p.seat };
   },
   'POST /api/join': (body, req) => {
     const match = getMatch(body.matchId);
-    const p = join(match, { name: str(body.name), avatar: str(body.avatar), ip: clientIp(req), agentId: joiningAgent(body) });
+    const p = join(match, { name: str(body.name), avatar: str(body.avatar), ip: clientIp(req), agentId: joiningAgent(body), entropy: str(body.entropy) });
     changed(match);
     return { matchId: match.id, token: p.token, seat: p.seat };
   },
