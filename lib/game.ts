@@ -46,7 +46,7 @@ export function exposure(v: View, draft: Draft): { level: number; text: string }
 export function describe(e: IntelEvent): [string, Tone] {
   switch (e.type) {
     case 'ping': return [`Ping from ${fmt(e.at)}: ${e.reading}`, undefined];
-    case 'leak': return [`Leak from ${fmt(e.at)}: drop is exactly ${e.distance} blocks away. ${districtOf(e.at)} flashed on their map.`, undefined];
+    case 'leak': return [`Leak from ${fmt(e.at)}: drop is exactly ${e.distance} ${e.distance === 1 ? 'block' : 'blocks'} away. ${districtOf(e.at)} flashed on their map.`, undefined];
     case 'flash': return [`Metadata flash over ${districtOf(e.region)}. Real leak or chaff?`, 'warn'];
     case 'chaffPlanted': return [`Chaff deployed over ${districtOf(e.region)}.`, undefined];
     case 'viewkey': return [`Viewing key on ${block(e.area)}: ${e.drop ? `drop at ${fmt(e.drop)}!` : 'no drop'}${e.rival ? `, rival at ${fmt(e.rival)}` : ''}.`, e.drop ? 'good' : undefined];
