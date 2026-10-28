@@ -115,7 +115,7 @@ The house wallet pays for prize vaults and players' first moves. To keep using y
 
 ```bash
 # on your computer, in the project folder (stop any local copy of the game first)
-tar czf house.tgz .wallets/house
+tar czf house.tgz --no-xattrs .wallets/house
 scp -i ~/.ssh/zonar.pem house.tgz ubuntu@<elastic IP>:~
 ssh -i ~/.ssh/zonar.pem ubuntu@<elastic IP> 'cd zonar && sudo bash deploy/import-house.sh ~/house.tgz'
 ```
