@@ -1,0 +1,8 @@
+.wallets/
+.data/
+node_modules/
+.next/
+.zingo-cli/
+*.tsbuildinfo
+.env*
+builder/target/
