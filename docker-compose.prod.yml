@@ -1,0 +1,31 @@
+# Production: one server behind CloudFront (see DEPLOY.md). deploy/setup.sh writes a .env that
+# points plain `docker compose` commands at this file and holds ORIGIN_SECRET.
+services:
+  zonar:
+    build: .
+    image: zonar
+    restart: unless-stopped
+    ports:
+      # CloudFront connects to the server over HTTP on port 80.
+      - "80:3000"
+    volumes:
+      # Plain folders beside the repo, so they're easy to see, copy and back up.
+      # .wallets holds the house seed and any unswept vaults: losing it loses their funds.
+      - ./.wallets:/app/.wallets
+      - ./.data:/app/.data
+    environment:
+      # Client IPs come from CloudFront's X-Forwarded-For (the prize limits need them).
+      TRUST_PROXY: "1"
+      # Requests without CloudFront's secret header are refused.
+      ORIGIN_SECRET: ${ORIGIN_SECRET:?run deploy/setup.sh first}
+      # One person on two tabs can't play themselves for prizes.
+      ALLOW_SAME_IP: "0"
+      # PRIZE_ZAT: 1000000           # 0.01 TAZ per head-to-head win
+      # PRIZE_DAILY_BUDGET_ZAT: 10000000
+      # PRIZE_MATCHES_PER_DAY: 3     # per player
+      # TURN_SECONDS: 60
+    logging:
+      driver: json-file
+      options:
+        max-size: 20m
+        max-file: "5"

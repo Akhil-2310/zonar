@@ -35,6 +35,10 @@ const MAX_MISSED = env('MAX_MISSED_TURNS', 3);
 const JOIN_MS = env('JOIN_MINUTES', 30) * 60_000;
 // Behind a reverse proxy the client's address arrives in X-Forwarded-For.
 const TRUST_PROXY = process.env.TRUST_PROXY === '1';
+// Behind CloudFront: a secret header CloudFront adds to every request it forwards. With it set,
+// requests that skip CloudFront (straight to the server's IP) are refused, so nobody can bypass
+// the proxy to fake their address. Requests from inside the machine are always allowed.
+const ORIGIN_SECRET = process.env.ORIGIN_SECRET || '';
 
 const useMock = process.env.LEDGER === 'mock' || !fs.existsSync(ZINGO_CLI);
 const ledger: Ledger = useMock
@@ -94,9 +98,19 @@ function seatFor(match: ChainMatch, token: unknown): Seat {
   return p.seat;
 }
 
+// The address our proxy saw. Proxies append to X-Forwarded-For, so the last entry is the one our
+// own proxy added; anything before it came from the client and can be made up.
 function clientIp(req: IncomingMessage): string {
-  const fwd = TRUST_PROXY ? String(req.headers['x-forwarded-for'] ?? '').split(',')[0].trim() : '';
+  const fwd = TRUST_PROXY ? String(req.headers['x-forwarded-for'] ?? '').split(',').at(-1)!.trim() : '';
   return fwd || req.socket.remoteAddress || 'unknown';
+}
+
+const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
+function fromOrigin(req: IncomingMessage): boolean {
+  if (!ORIGIN_SECRET || LOOPBACK.has(req.socket.remoteAddress ?? '')) return true;
+  const got = Buffer.from(String(req.headers['x-origin-secret'] ?? ''));
+  const want = Buffer.from(ORIGIN_SECRET);
+  return got.length === want.length && crypto.timingSafeEqual(got, want);
 }
 
 function fullView(match: ChainMatch, seat: Seat): GameView {
@@ -430,6 +444,10 @@ await app.prepare();
 
 server.on('request', async (req: IncomingMessage, res: ServerResponse) => {
   const url = new URL(req.url ?? '/', 'http://x');
+  if (!fromOrigin(req)) {
+    res.writeHead(403, { 'content-type': 'text/plain' });
+    return res.end('Open Zonar through its public link.\n');
+  }
   res.setHeader('content-security-policy', CSP);
   res.setHeader('referrer-policy', 'no-referrer');
   res.setHeader('permissions-policy', 'camera=(), microphone=(), geolocation=(), interest-cohort=()');

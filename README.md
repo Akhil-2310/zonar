@@ -94,12 +94,14 @@ Build the builder with `cargo build --release -p zonar-builder` in `builder/` (t
 
 The server keeps wallet processes and match state alive, so it needs a long-running host with persistent disk (a VPS, Fly.io, Railway). Serverless platforms like Vercel won't work.
 
+**Step-by-step on AWS Lightsail with a free CloudFront HTTPS address: see [DEPLOY.md](DEPLOY.md).** The rest of this section is the general picture.
+
 ```
 docker compose up --build -d
 ```
 
 - **What's in the image:** zingo-cli and its Nym proxy are built from a pinned zingolib commit. Wallets go in the `wallets` volume and match state in `data`. **Back up `wallets`:** it holds the house seed and any unswept vaults.
-- **Behind a TLS reverse proxy** (Caddy, nginx), set `TRUST_PROXY=1` so the prize limits see real client IPs.
+- **Behind a TLS reverse proxy** (CloudFront, Caddy, nginx), set `TRUST_PROXY=1` so the prize limits see real client IPs (the last `X-Forwarded-For` entry, the one the proxy added). Set `ORIGIN_SECRET` and have the proxy send it as `X-Origin-Secret` to refuse requests that bypass the proxy.
 - **House funds:** on first boot a new house wallet is created. Fund its address (shown on the landing page) from a testnet faucet. To reuse an existing house, copy its folder into the `wallets` volume as `house/`.
 
 ## Privacy in the UI
