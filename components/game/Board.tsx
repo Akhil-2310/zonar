@@ -67,26 +67,46 @@ export default function Board({ view: v, draft, onCell }: { view: GameView; draf
           {vkNow && inArea(vkNow.area, p) && <span className="pointer-events-none absolute inset-0 outline outline-2 -outline-offset-2 outline-zec-deep" />}
           {flashOld && <span className="pointer-events-none absolute inset-[6%] border-2 border-dotted border-alert/70" />}
           {isDest && <DestMarker />}
-          {r && cands && <span className={`absolute right-[4%] top-[4%] z-20 px-1 font-tiny text-[9px] leading-[13px] ${READING[r.cls]}`}>{r.txt}</span>}
-          {dug.has(fmt(p)) && <span className="absolute bottom-[4%] right-[6%] z-20 font-tiny text-sm font-bold text-lcd-ink">×</span>}
+          {r && cands && <span className={`absolute right-[3%] top-[3%] z-20 rounded-[3px] border-2 border-lcd-ink px-1 font-tiny text-[12px] font-bold leading-[16px] shadow-[1px_1px_0_rgba(47,59,34,0.5)] ${READING[r.cls]}`}>{r.txt}</span>}
+          {dug.has(fmt(p)) && <span className="absolute bottom-[3%] right-[5%] z-20 font-tiny text-lg font-bold leading-none text-lcd-ink">×</span>}
           {homeYou && !isYou && <Icon name="house" className="absolute h-[46%] w-[46%] opacity-90" />}
           {homeRival && (v.phase === 'over' ? !same(p, v.rival?.pos) : true) && <Icon name="house" className="absolute h-[46%] w-[46%] opacity-80 hue-rotate-[200deg]" />}
-          {homeYou && <span className="absolute bottom-[3%] z-20 bg-butter px-1 font-tiny text-[8px] leading-[11px] text-ink">HOME</span>}
-          {homeRival && <span className="absolute bottom-[3%] z-20 bg-sky px-1 font-tiny text-[8px] leading-[11px] text-ink">RIVAL</span>}
+          {homeYou && <span className="absolute bottom-[3%] z-20 rounded-[3px] border-2 border-ink bg-butter px-1 font-tiny text-[11px] leading-[14px] text-ink">HOME</span>}
+          {homeRival && <span className="absolute bottom-[3%] z-20 rounded-[3px] border-2 border-ink bg-sky px-1 font-tiny text-[11px] leading-[14px] text-ink">RIVAL</span>}
           <Token v={v} p={p} seen={seen} lt={lt} cands={cands} vkNow={vkNow} />
         </button>,
       );
     }
 
+  const axis = Array.from({ length: v.size }, (_, i) => i);
+  const ruler = (vertical: boolean) => (
+    <div className={`grid font-tiny text-[13px] leading-none text-lcd ${vertical ? 'grid-rows-7' : 'grid-cols-7'}`}>
+      {axis.map((i) => {
+        const mine = vertical ? i === v.you.pos.y : i === v.you.pos.x;
+        return (
+          <span key={i} className={`flex items-center justify-center ${mine ? 'text-butter' : 'opacity-70'}`}>
+            {vertical ? i + 1 : 'ABCDEFG'[i]}
+          </span>
+        );
+      })}
+    </div>
+  );
+
+  // Rulers along the top and left edge, so every tile can be called out by name (D4).
   return (
-    <div className="lcd relative aspect-square w-full overflow-hidden rounded-[10px]">
-      <div className="absolute inset-0">
-        <PixelCity />
+    <div className="grid grid-cols-[20px_minmax(0,1fr)] grid-rows-[20px_auto] gap-1">
+      <span />
+      {ruler(false)}
+      {ruler(true)}
+      <div className="lcd relative aspect-square w-full overflow-hidden rounded-[10px]">
+        <div className="absolute inset-0">
+          <PixelCity />
+        </div>
+        <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${v.size}, 1fr)`, gridTemplateRows: `repeat(${v.size}, 1fr)` }}>
+          {cells}
+        </div>
+        <PixelCityOverlay />
       </div>
-      <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${v.size}, 1fr)`, gridTemplateRows: `repeat(${v.size}, 1fr)` }}>
-        {cells}
-      </div>
-      <PixelCityOverlay />
     </div>
   );
 }
@@ -113,7 +133,7 @@ function Token({ v, p, seen, lt, cands, vkNow }: TokenProps) {
     return (
       <div className={wrap}>
         <Avatar id={v.you.avatar} mood={yourMood(v).mood} className="h-full w-full drop-shadow-[2px_2px_0_rgba(47,59,34,0.35)]" />
-        <span className="absolute -top-[18%] left-1/2 -translate-x-1/2 font-tiny text-[9px] leading-none text-zec-deep">▼</span>
+        <span className="absolute -top-[20%] left-1/2 -translate-x-1/2 animate-bob font-tiny text-[13px] leading-none text-zec-deep">▼</span>
         {v.you.carrying && carry}
       </div>
     );
@@ -133,7 +153,7 @@ function Token({ v, p, seen, lt, cands, vkNow }: TokenProps) {
       <div className={`${wrap} ${age ? 'opacity-45 grayscale' : ''}`}>
         <Avatar id={rival.avatar} mood={rivalMood(v)} animate={!age} className="h-full w-full" />
         {rival.carrying && carry}
-        {age > 0 && <span className="absolute -bottom-[6%] left-1/2 -translate-x-1/2 bg-rival px-1 font-tiny text-[8px] leading-[11px] text-white">T-{age}</span>}
+        {age > 0 && <span className="absolute -bottom-[6%] left-1/2 -translate-x-1/2 rounded-[3px] bg-rival px-1 font-tiny text-[11px] leading-[14px] text-white">T-{age}</span>}
       </div>
     );
   }

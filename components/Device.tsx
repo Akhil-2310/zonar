@@ -30,7 +30,7 @@ export default function Device({
 }) {
   const s = SHELL[shell];
   return (
-    <div className={`relative mx-auto w-full max-w-[640px] pt-7 ${className}`}>
+    <div className={`relative mx-auto w-full max-w-[680px] pt-7 ${className}`}>
       {/* keychain loop */}
       <div className="absolute left-1/2 top-0 z-0 h-12 w-12 -translate-x-1/2 rounded-full border-[6px] border-ink bg-transparent" />
       <div

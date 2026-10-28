@@ -10,12 +10,14 @@ import Device, { ScreenIcon } from '@/components/Device';
 import Avatar from '@/components/Avatar';
 import { Icon } from '@/components/Pixel';
 import { End, Waiting } from '@/components/game/Modals';
+import Celebration from '@/components/Celebration';
+import { Toasts, useToasts } from '@/components/Toasts';
 import { DIRS } from '@/lib/belief';
-import { ACTIONS, MOVE_KEYS, needsAim, type Draft } from '@/lib/game';
-import { api, session as tokens, taz, type Session } from '@/lib/api';
+import { ACTIONS, MOVE_KEYS, describe, needsAim, type Draft } from '@/lib/game';
+import { api, prefs, session as tokens, taz, type Session } from '@/lib/api';
 import { mmss, useSecondsLeft } from '@/lib/useClock';
 import { sealOnchain, storedAgent } from '@/lib/agent';
-import type { ActionId, Dir, GameView, Pos } from '@/lib/types';
+import type { ActionId, Dir, GameView, IntelEvent, Pos } from '@/lib/types';
 
 const freshDraft = (): Draft => ({ move: { dx: 0, dy: 0 }, action: 'ping', target: null });
 // Arrow keys nudge the chosen step one tile at a time: ↑ then → is the up-right diagonal,
@@ -28,6 +30,20 @@ const ARROW_NUDGE: Record<string, Dir> = {
 };
 const clampStep = (n: number) => Math.max(-1, Math.min(1, n));
 
+// The pixel icon for each kind of clue, used by the turn toasts.
+const INTEL_ICON: Record<IntelEvent['type'], string> = {
+  ping: 'ping',
+  leak: 'leak',
+  flash: 'eye',
+  chaffPlanted: 'chaff',
+  viewkey: 'viewkey',
+  dig: 'dig',
+  rivalPickup: 'chest',
+  rivalSeen: 'eye',
+  exposed: 'eye',
+  collision: 'star',
+};
+
 export default function Game() {
   const id = String(useParams<{ id: string }>().id);
   const [session, setSession] = useState<Session | null>(null);
@@ -36,12 +52,15 @@ export default function Game() {
   const [draft, setDraft] = useState<Draft>(freshDraft);
   const [aiming, setAiming] = useState(false);
   const [modalClosed, setModalClosed] = useState(false);
+  // The win party plays once per match, not on every reload.
+  const [party, setParty] = useState(false);
   const [error, setError] = useState('');
   // Progress of an on-chain seal: building, signing, broadcasting.
   const [sealing, setSealing] = useState('');
   const turnRef = useRef<number | null>(null);
   const viewRef = useRef<GameView | null>(null);
   const secondsLeft = useSecondsLeft(view?.clock);
+  const { toasts, push: toast, dismiss } = useToasts();
 
   useEffect(() => {
     const token = tokens.get(id);
@@ -53,9 +72,21 @@ export default function Game() {
       got = true;
       setLost(null);
       const next = JSON.parse(e.data) as GameView;
+      const prev = viewRef.current;
       if (turnRef.current !== null && next.turn !== turnRef.current) {
         setDraft(freshDraft());
         setAiming(false);
+      }
+      // After each turn resolves, every new clue pops up as a toast.
+      if (prev) {
+        const fresh = next.intel.slice(prev.intel.length);
+        fresh.forEach((ev, i) => {
+          const [text, tone] = describe(ev);
+          toast({ text, tone: tone ?? 'info', icon: ev.type === 'dig' && ev.found ? 'chest' : INTEL_ICON[ev.type], title: `Turn ${ev.turn}` }, i * 350);
+        });
+        if (!fresh.length && next.turn !== prev.turn && next.phase === 'active') toast({ text: 'Turn resolved. Nothing new on your screen.', icon: 'none', title: `Turn ${prev.turn}` });
+        if (prev.phase === 'waiting' && next.phase === 'active') toast({ text: `${next.rival?.name ?? 'Your rival'} is in. The hunt is on.`, icon: 'star', title: 'Match start' });
+        if (!next.rival?.isBot && !prev.rival?.locked && next.rival?.locked && next.phase === 'active' && !next.you.locked) toast({ text: `${next.rival?.name} has sealed their move.`, icon: 'lock', title: 'Rival' });
       }
       turnRef.current = next.turn;
       viewRef.current = next;
@@ -68,6 +99,13 @@ export default function Game() {
     };
     return () => es.close();
   }, [id]);
+
+  const won = view?.phase === 'over' && view.result?.winner === view.seat;
+  useEffect(() => {
+    if (!won || prefs.get('celebrated:' + id)) return;
+    prefs.set('celebrated:' + id, '1');
+    setParty(true);
+  }, [won, id]);
 
   // A ping you can't afford falls back to holding.
   useEffect(() => {
@@ -89,6 +127,7 @@ export default function Game() {
     if (!view.onchain.enabled) {
       try {
         await api('/api/orders', { ...session, ...draft });
+        toast({ text: `${ACTIONS.find((a) => a.id === draft.action)?.label} sealed. Waiting for the turn to resolve.`, icon: draft.action, title: `Turn ${view.turn}` });
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
       }
@@ -106,6 +145,7 @@ export default function Game() {
       try {
         setSealing('Unlocking your agent…');
         await sealOnchain(agent, session, view.turn, view.seat, draft, setSealing);
+        toast({ text: 'Move signed and broadcast as a shielded transaction.', icon: 'lock', title: `Turn ${view.turn}`, tone: 'good' });
         break;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
@@ -120,7 +160,7 @@ export default function Game() {
       }
     }
     setSealing('');
-  }, [active, draft, session, view, sealing]);
+  }, [active, draft, session, view, sealing, toast]);
 
   const onCell = (p: Pos) => {
     if (!active || !view) return;
@@ -199,14 +239,14 @@ export default function Game() {
     <div className="flex gap-1">
       {ACTIONS.map((a) => (
         <ScreenIcon key={a.id} label={`${a.label} (${v.costs[a.id] || 'free'})`} selected={draft.action === a.id} disabled={!active || v.costs[a.id] > v.you.credits} onClick={() => setAction(a.id)}>
-          <Icon name={a.id} size={22} />
-          <span className="font-tiny text-[8px] leading-none">{v.costs[a.id] ? `${v.costs[a.id]}♥` : 'free'}</span>
+          <Icon name={a.id} size={26} />
+          <span className="font-tiny text-[11px] leading-none">{v.costs[a.id] ? `${v.costs[a.id]}♥` : 'free'}</span>
         </ScreenIcon>
       ))}
     </div>
   );
   const statusRow = (
-    <div className="flex items-center justify-between gap-2 px-1 font-tiny text-[11px] text-lcd">
+    <div className="flex items-center justify-between gap-2 px-1 font-tiny text-[14px] text-lcd">
       <span className="flex items-center gap-1.5">
         <Icon name="clock" size={16} />
         <span className={urgent ? 'animate-pulse-dot text-alert' : ''}>{v.phase === 'active' && secondsLeft !== null ? mmss(secondsLeft) : '--:--'}</span>
@@ -239,8 +279,9 @@ export default function Game() {
         </div>
       </header>
 
-      <main className="mx-auto grid max-w-[1400px] items-start gap-6 px-5 pt-6 xl:grid-cols-[300px_minmax(0,640px)_360px] xl:justify-center">
-        <section className="order-1 xl:order-2">
+      <main className="mx-auto grid max-w-[1320px] items-start gap-6 px-5 pt-6 lg:grid-cols-[minmax(0,1fr)_400px] xl:grid-cols-[minmax(0,1fr)_440px]">
+        {/* The map: the handheld on the left. */}
+        <section>
           <Device
             top={actionRow}
             bottom={statusRow}
@@ -252,25 +293,27 @@ export default function Game() {
           >
             <Board view={v} draft={draft} onCell={onCell} />
           </Device>
-          <div className="mt-4 min-h-6 text-center">
+          <div className="mt-3 min-h-6 text-center">
             {lost === 'retrying' && <span className="font-tiny text-xs text-alert">reconnecting…</span>}
             {error && <span className="toy-sm inline-block rounded-lg bg-alert-soft px-3 py-1 text-sm text-alert">{error}</span>}
           </div>
           <Legend />
         </section>
 
-        <aside className="order-2 space-y-5 xl:order-1">
-          <PetStatus view={v} draft={draft} />
-          <RivalCard view={v} />
-        </aside>
-
-        <aside className="order-3 space-y-5">
+        {/* Everything else: you, the rival, your orders, what you've learned, the chain. */}
+        <aside className="space-y-5">
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-1">
+            <PetStatus view={v} draft={draft} />
+            <RivalCard view={v} />
+          </div>
           <Orders view={v} draft={draft} aiming={aiming} onMove={setMove} onAction={setAction} onSeal={seal} secondsLeft={secondsLeft} sealing={sealing} />
           <Intel view={v} />
           <Trail view={v} onResign={() => session && confirm('Resign this match?') && api('/api/resign', session)} />
         </aside>
       </main>
 
+      <Toasts toasts={toasts} onDismiss={dismiss} />
+      {party && <Celebration avatar={v.you.avatar} title={mode === 'prize' ? 'Vault cracked!' : 'Extraction!'} sub={mode === 'prize' ? `${taz(v.chain.prizeZat)} is yours to claim.` : 'You carried the drop home.'} />}
       {v.phase === 'waiting' && <Waiting view={v} />}
       {v.phase === 'over' && session && !modalClosed && <End view={v} session={session} onClose={() => setModalClosed(true)} />}
       {v.phase === 'over' && modalClosed && (
@@ -292,7 +335,7 @@ function Legend() {
     ['surveillance', <span key="s" className="block h-2 w-2 bg-alert" />],
   ];
   return (
-    <div className="mx-auto mt-2 flex max-w-[640px] flex-wrap justify-center gap-x-4 gap-y-2 font-tiny text-[10px] uppercase text-muted">
+    <div className="mx-auto mt-1 flex max-w-[720px] flex-wrap justify-center gap-x-4 gap-y-2 font-tiny text-[11px] uppercase text-muted">
       {items.map(([label, swatch]) => (
         <span key={label} className="flex items-center gap-1.5">
           {swatch}
